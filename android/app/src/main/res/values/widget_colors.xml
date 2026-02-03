@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light Mode Colors -->
+    <color name="widget_background_light">#FFFFFF</color>
+    <color name="widget_text_color_light">#10b981</color>
+    <color name="widget_secondary_text_color_light">#666666</color>
+    <color name="widget_border_color_light">#10b981</color>
+    
+    <!-- Dark Mode Colors -->
+    <color name="widget_background_dark">#1F2937</color>
+    <color name="widget_text_color_dark">#34D399</color>
+    <color name="widget_secondary_text_color_dark">#9CA3AF</color>
+    <color name="widget_border_color_dark">#34D399</color>
+    
+    <!-- Default to light mode -->
+    <color name="widget_background">@color/widget_background_light</color>
+    <color name="widget_text_color">@color/widget_text_color_light</color>
+    <color name="widget_secondary_text_color">@color/widget_secondary_text_color_light</color>
+    <color name="widget_border_color">@color/widget_border_color_light</color>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NutriLens</string>
+    <string name="title_activity_main">NutriLens</string>
+    <string name="package_name">com.nutrilens.app</string>
+    <string name="custom_url_scheme">com.nutrilens.app</string>
+    <string name="widget_description">NutriLens Step Counter</string>
+    <string name="widget_description_small">NutriLens Steps (3x2)</string>
+    <string name="widget_description_medium">NutriLens Steps (4x2)</string>
+    <string name="widget_description_large">NutriLens Steps (5x3)</string>
+</resources>

@@ -1,0 +1,29 @@
+{
+  "iconBackgroundColor": "#ffffff",
+  "iconBackgroundColorDark": "#1a1a1a",
+  "logo": {
+    "imagePath": "./src/assets/nutrilens-icon.png",
+    "backgroundColor": "#ffffff",
+    "flatten": true
+  },
+  "splash": {
+    "imagePath": "./src/assets/nutrilens-icon.png",
+    "backgroundColor": "#10B981",
+    "resize": "contain"
+  },
+  "icon": {
+    "imagePath": "./src/assets/nutrilens-icon.png",
+    "resize": "contain",
+    "backgroundColor": "#ffffff"
+  },
+  "android": {
+    "iconBackgroundColor": "#ffffff",
+    "iconBackgroundColorDark": "#1a1a1a",
+    "adaptiveIcon": {
+      "foregroundImage": "./src/assets/nutrilens-icon.png",
+      "backgroundColor": "#ffffff",
+      "backgroundColorDark": "#1a1a1a"
+    }
+  }
+}
+

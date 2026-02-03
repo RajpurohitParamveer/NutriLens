@@ -1,0 +1,7 @@
+project_id = "rrhdjyvqxpuknysrhgzb"
+
+[functions.analyze-nutrition]
+verify_jwt = false
+
+[functions.analyze-nutrition-ai]
+verify_jwt = false

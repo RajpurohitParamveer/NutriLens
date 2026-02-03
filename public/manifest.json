@@ -1,0 +1,34 @@
+{
+  "name": "NutriLens",
+  "short_name": "NutriLens",
+  "description": "Scan nutrition labels. Get instant health insights.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F9FAFB",
+  "theme_color": "#10B981",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/nutrilens-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/nutrilens-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "food", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "Scan Label",
+      "short_name": "Scan",
+      "description": "Scan a nutrition label",
+      "url": "/scan",
+      "icons": [{ "src": "/scan-icon.png", "sizes": "96x96" }]
+    }
+  ]
+}
