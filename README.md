@@ -63,6 +63,9 @@ NutriLens focuses on making healthier choices easy:
   - AI nutrition analysis (Supabase Edge functions in `supabase/functions`)
 
 ---
+## Screenshots
+
+---
 
 ## Project structure (high level)
 
