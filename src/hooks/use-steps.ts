@@ -74,7 +74,7 @@ export function useSteps() {
       
       updateIntervalRef.current = setInterval(() => {
         loadTodaySteps();
-      }, 10000); // Update every 10 seconds from native service
+      }, 3000); // Update every 3 seconds from native service for responsive charts
     } else {
       // For web, step counter not available
       setIsSupported(false);
@@ -153,6 +153,11 @@ export function useSteps() {
             const steps = androidWidget.getCurrentSteps();
             setTodaySteps(steps);
             setIsTracking(true);
+            
+            // Trigger chart updates with current steps directly
+            loadWeeklySteps(steps);
+            loadMonthlySteps(steps);
+            
             return;
           }
         } catch (error) {
@@ -167,13 +172,20 @@ export function useSteps() {
         const data = JSON.parse(stored);
         setTodaySteps(data.steps || 0);
         setIsTracking(data.isTracking || false);
+        
+        // Trigger chart updates with current steps directly
+        loadWeeklySteps(data.steps || 0);
+        loadMonthlySteps(data.steps || 0);
       }
     } catch {
       setTodaySteps(0);
+      // Trigger chart updates with 0 steps
+      loadWeeklySteps(0);
+      loadMonthlySteps(0);
     }
   };
 
-  const loadWeeklySteps = useCallback(() => {
+  const loadWeeklySteps = useCallback((currentSteps: number = todaySteps) => {
     try {
       const today = new Date();
       const week: StepsData[] = [];
@@ -190,12 +202,12 @@ export function useSteps() {
         const dateStr = date.toISOString().split('T')[0];
         
         if (dateStr === today.toISOString().split('T')[0]) {
-          // For today, use current steps from native service
+          // For today, use current steps from parameter
           week.push({ 
-            steps: todaySteps, 
+            steps: currentSteps, 
             date: dateStr,
-            distance: Math.round((todaySteps / STEPS_PER_KM) * 100) / 100,
-            calories: Math.round(todaySteps * CALORIES_PER_STEP)
+            distance: Math.round((currentSteps / STEPS_PER_KM) * 100) / 100,
+            calories: Math.round(currentSteps * CALORIES_PER_STEP)
           });
         } else {
           // For other days, use 0 steps (we don't have historical data from native service yet)
@@ -214,7 +226,7 @@ export function useSteps() {
     }
   }, [todaySteps]);
 
-  const loadMonthlySteps = useCallback(() => {
+  const loadMonthlySteps = useCallback((currentSteps: number = todaySteps) => {
     try {
       const today = new Date();
       const currentMonth = today.getMonth();
@@ -229,12 +241,12 @@ export function useSteps() {
         const dateStr = date.toISOString().split('T')[0];
         
         if (day === today.getDate()) {
-          // For today, use current steps from native service
+          // For today, use current steps from parameter
           monthData.push({
             date: dateStr,
-            steps: todaySteps,
-            distance: Math.round((todaySteps / STEPS_PER_KM) * 100) / 100,
-            calories: Math.round(todaySteps * CALORIES_PER_STEP)
+            steps: currentSteps,
+            distance: Math.round((currentSteps / STEPS_PER_KM) * 100) / 100,
+            calories: Math.round(currentSteps * CALORIES_PER_STEP)
           });
         } else {
           // For other days, use 0 steps (we don't have historical data from native service yet)

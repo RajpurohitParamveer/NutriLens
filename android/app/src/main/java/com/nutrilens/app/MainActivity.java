@@ -37,17 +37,23 @@ public class MainActivity extends BridgeActivity {
     }
     
     private void requestStepTrackingPermissions() {
-        // Only request Activity Recognition for step tracking
+        // Request permissions needed for foreground step tracking service
         String[] permissions = {
-            Manifest.permission.ACTIVITY_RECOGNITION
+            Manifest.permission.ACTIVITY_RECOGNITION,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
         };
         
-        // Check if permission is already granted
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "Requesting Activity Recognition permission");
+        // Check if permissions are already granted
+        boolean activityRecognitionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED;
+        boolean fineLocationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean coarseLocationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        
+        if (!activityRecognitionGranted || !fineLocationGranted || !coarseLocationGranted) {
+            Log.d(TAG, "Requesting permissions for foreground step tracking service");
             ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
         } else {
-            Log.d(TAG, "Activity Recognition permission already granted");
+            Log.d(TAG, "All permissions already granted for foreground service");
             // Start step counter service if permission is already granted
             startStepCounterService();
         }
@@ -58,12 +64,20 @@ public class MainActivity extends BridgeActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         
         if (requestCode == PERMISSION_REQUEST_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d(TAG, "Activity Recognition permission granted");
-                // Start step counter service when permission is granted
+            boolean allGranted = true;
+            for (int i = 0; i < grantResults.length; i++) {
+                if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    Log.d(TAG, "Permission denied: " + permissions[i]);
+                }
+            }
+            
+            if (allGranted) {
+                Log.d(TAG, "All permissions granted for foreground service");
+                // Start step counter service when all permissions are granted
                 startStepCounterService();
             } else {
-                Log.d(TAG, "Activity Recognition permission denied");
+                Log.d(TAG, "Some permissions denied - foreground service may not work");
             }
         }
     }
@@ -122,7 +136,8 @@ public class MainActivity extends BridgeActivity {
             
             try {
                 // Call StepCounterService directly to avoid recursion
-                StepCounterService.updateGoal(MainActivity.this, dailyGoal);
+                // Use singleton SharedPreferences for consistency
+                StepCounterService.updateGoal(getApplicationContext(), dailyGoal);
                 
                 Log.d(TAG, "Goal updated successfully from JS interface");
             } catch (Exception e) {
@@ -134,16 +149,10 @@ public class MainActivity extends BridgeActivity {
         public int getCurrentSteps() {
             Log.d(TAG, "JS Interface getCurrentSteps called");
             
-            // Ensure service is running
-            try {
-                Intent serviceIntent = new Intent(MainActivity.this, StepCounterService.class);
-                startService(serviceIntent);
-                Log.d(TAG, "Step counter service start requested");
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to start step counter service", e);
-            }
-            
-            return StepCounterService.getCurrentSteps(MainActivity.this);
+            // Just get current steps without restarting service
+            // Service should already be running from onCreate
+            // Use singleton SharedPreferences for consistency
+            return StepCounterService.getCurrentSteps(getApplicationContext());
         }
     }
 }
