@@ -2,15 +2,12 @@ import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useSteps } from "@/hooks/use-steps";
-import { useWidget } from "@/hooks/use-widget";
-import { Footprints, TrendingUp, Calendar, RefreshCw } from "lucide-react";
+import { Footprints, TrendingUp, Calendar } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function Steps() {
   const navigate = useNavigate();
-  const { updateWidget, updateGoal } = useWidget();
   const {
     todaySteps,
     weeklySteps,
@@ -61,22 +58,6 @@ export default function Steps() {
                 style={{ width: `${Math.min(100, (todaySteps / dailyStepGoal) * 100)}%` }}
               />
             </div>
-          </div>
-
-          {/* Debug Widget Update Button */}
-          <div className="mt-4 pt-4 border-t border-border">
-            <Button 
-              onClick={() => {
-                console.log('Testing widget update...');
-                updateWidget(todaySteps, dailyStepGoal);
-              }}
-              variant="outline" 
-              size="sm"
-              className="w-full"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Update Widget
-            </Button>
           </div>
         </Card>
 

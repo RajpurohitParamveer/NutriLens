@@ -54,19 +54,27 @@ export function useSteps() {
   }, [todaySteps, dailyStepGoal, updateWidget]);
 
   const checkSupport = async () => {
-    // For now, use fallback implementation since plugins aren't working
+    // Check if we're on a native platform with step counter support
     const isNative = Capacitor.isNativePlatform();
-    
+
     if (isNative) {
       // On Android with Activity Recognition permission, we should support step tracking
-      // For now, use fallback until native step counter is implemented
       setIsSupported(true);
-      
-      // Start fallback tracking
+
+      // Start tracking (this will now use the native service)
       if (!isInitializedRef.current) {
         isInitializedRef.current = true;
-        startFallbackTracking();
+        startTracking();
       }
+      
+      // Load steps from native service periodically
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+      }
+      
+      updateIntervalRef.current = setInterval(() => {
+        loadTodaySteps();
+      }, 10000); // Update every 10 seconds from native service
     } else {
       // For web, step counter not available
       setIsSupported(false);
@@ -78,10 +86,40 @@ export function useSteps() {
       const stored = localStorage.getItem(STEP_GOAL_KEY);
       if (stored) {
         const n = parseInt(stored, 10);
-        if (!isNaN(n) && n > 0) setDailyStepGoalState(n);
+        if (!isNaN(n) && n > 0) {
+          setDailyStepGoalState(n);
+          
+          // Sync to native service for widget
+          if (Capacitor.isNativePlatform()) {
+            try {
+              const androidWidget = (window as any).AndroidWidget;
+              if (androidWidget && androidWidget.updateGoal) {
+                androidWidget.updateGoal(n);
+                console.log(`Step goal synced to native service on load: ${n}`);
+              }
+            } catch (error) {
+              console.log('Failed to sync goal to native service on load:', error);
+            }
+          }
+        }
+      } else {
+        // No goal set, use default 8000 and sync to native
+        setDailyStepGoalState(DEFAULT_STEP_GOAL);
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const androidWidget = (window as any).AndroidWidget;
+            if (androidWidget && androidWidget.updateGoal) {
+              androidWidget.updateGoal(DEFAULT_STEP_GOAL);
+              console.log(`Default step goal synced to native service: ${DEFAULT_STEP_GOAL}`);
+            }
+          } catch (error) {
+            console.log('Failed to sync default goal to native service:', error);
+          }
+        }
       }
     } catch {
       // keep default
+      setDailyStepGoalState(DEFAULT_STEP_GOAL);
     }
   };
 
@@ -89,10 +127,40 @@ export function useSteps() {
     const v = Math.max(1, Math.min(200000, goal));
     setDailyStepGoalState(v);
     localStorage.setItem(STEP_GOAL_KEY, String(v));
+    
+    // Sync goal to native service for widget
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const androidWidget = (window as any).AndroidWidget;
+        if (androidWidget && androidWidget.updateGoal) {
+          androidWidget.updateGoal(v);
+          console.log(`Step goal synced to native service: ${v}`);
+        }
+      } catch (error) {
+        console.log('Failed to sync goal to native service:', error);
+      }
+    }
   }, []);
 
   const loadTodaySteps = () => {
     try {
+      if (Capacitor.isNativePlatform()) {
+        // Try to get steps from native service
+        try {
+          const androidWidget = (window as any).AndroidWidget;
+          if (androidWidget && androidWidget.getCurrentSteps) {
+            // If native method is available, use it
+            const steps = androidWidget.getCurrentSteps();
+            setTodaySteps(steps);
+            setIsTracking(true);
+            return;
+          }
+        } catch (error) {
+          console.log('Native step reading not available, using fallback');
+        }
+      }
+      
+      // Fallback to localStorage
       const today = new Date().toISOString().split("T")[0];
       const stored = localStorage.getItem(`${STORAGE_KEY}-${today}`);
       if (stored) {
@@ -107,78 +175,39 @@ export function useSteps() {
 
   const loadWeeklySteps = useCallback(() => {
     try {
-      const stored = localStorage.getItem(`${STORAGE_KEY}-weekly`);
       const today = new Date();
+      const week: StepsData[] = [];
       
-      if (stored) {
-        const weekData = JSON.parse(stored);
-        // Ensure we have data for the last 7 days starting from Monday
-        const week: StepsData[] = [];
+      // Get Monday of current week
+      const monday = new Date(today);
+      const day = monday.getDay();
+      const diff = monday.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday (0)
+      monday.setDate(diff);
+      
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + i);
+        const dateStr = date.toISOString().split('T')[0];
         
-        // Get Monday of current week
-        const monday = new Date(today);
-        const day = monday.getDay();
-        const diff = monday.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday (0)
-        monday.setDate(diff);
-        
-        for (let i = 0; i < 7; i++) {
-          const date = new Date(monday);
-          date.setDate(monday.getDate() + i);
-          const dateStr = date.toISOString().split('T')[0];
-          const existingDay = weekData.find((d: StepsData) => d.date === dateStr);
-          
-          if (existingDay) {
-            week.push(existingDay);
-          } else if (dateStr === today.toISOString().split('T')[0]) {
-            // For today, use current steps
-            week.push({ 
-              steps: todaySteps, 
-              date: dateStr,
-              distance: Math.round((todaySteps / STEPS_PER_KM) * 100) / 100,
-              calories: Math.round(todaySteps * CALORIES_PER_STEP)
-            });
-          } else {
-            // For other days, add zero steps
-            week.push({ 
-              steps: 0, 
-              date: dateStr,
-              distance: 0,
-              calories: 0
-            });
-          }
+        if (dateStr === today.toISOString().split('T')[0]) {
+          // For today, use current steps from native service
+          week.push({ 
+            steps: todaySteps, 
+            date: dateStr,
+            distance: Math.round((todaySteps / STEPS_PER_KM) * 100) / 100,
+            calories: Math.round(todaySteps * CALORIES_PER_STEP)
+          });
+        } else {
+          // For other days, use 0 steps (we don't have historical data from native service yet)
+          week.push({ 
+            steps: 0, 
+            date: dateStr,
+            distance: 0,
+            calories: 0
+          });
         }
-        setWeeklySteps(week);
-        localStorage.setItem(`${STORAGE_KEY}-weekly`, JSON.stringify(week));
-      } else {
-        // Initialize with last 7 days starting from Monday
-        const week: StepsData[] = [];
-        
-        // Get Monday of current week
-        const monday = new Date(today);
-        const day = monday.getDay();
-        const diff = monday.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday (0)
-        monday.setDate(diff);
-        
-        for (let i = 0; i < 7; i++) {
-          const date = new Date(monday);
-          date.setDate(monday.getDate() + i);
-          const dateStr = date.toISOString().split('T')[0];
-          const dayData = localStorage.getItem(`${STORAGE_KEY}-${dateStr}`);
-          
-          week.push(
-            dayData 
-              ? JSON.parse(dayData)
-              : { 
-                  steps: 0, 
-                  date: dateStr,
-                  distance: 0,
-                  calories: 0
-                }
-          );
-        }
-        setWeeklySteps(week);
-        localStorage.setItem(`${STORAGE_KEY}-weekly`, JSON.stringify(week));
       }
+      setWeeklySteps(week);
     } catch (error) {
       console.error('Error loading weekly steps:', error);
       setWeeklySteps([]);
@@ -187,65 +216,38 @@ export function useSteps() {
 
   const loadMonthlySteps = useCallback(() => {
     try {
-      const stored = localStorage.getItem(`${STORAGE_KEY}-monthly`);
       const today = new Date();
       const currentMonth = today.getMonth();
       const currentYear = today.getFullYear();
       const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
       
-      let monthData: StepsData[] = [];
+      const monthData: StepsData[] = [];
       
-      // If we have stored monthly data, use it
-      if (stored) {
-        monthData = JSON.parse(stored);
-        
-        // Check if the data is from the current month
-        const firstDay = monthData[0]?.date;
-        if (firstDay) {
-          const dataMonth = new Date(firstDay).getMonth();
-          const dataYear = new Date(firstDay).getFullYear();
-          
-          if (dataMonth !== currentMonth || dataYear !== currentYear) {
-            // If data is from a different month, reset
-            monthData = [];
-          }
-        }
-      }
-      
-      // Ensure we have data for each day of the current month
-      const updatedMonthData = [];
+      // Generate data for each day of the current month
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(currentYear, currentMonth, day);
         const dateStr = date.toISOString().split('T')[0];
-        const existingDay = monthData.find(d => d.date === dateStr);
         
-        if (existingDay) {
-          updatedMonthData.push(existingDay);
+        if (day === today.getDate()) {
+          // For today, use current steps from native service
+          monthData.push({
+            date: dateStr,
+            steps: todaySteps,
+            distance: Math.round((todaySteps / STEPS_PER_KM) * 100) / 100,
+            calories: Math.round(todaySteps * CALORIES_PER_STEP)
+          });
         } else {
-          // For today, use current steps
-          if (day === today.getDate()) {
-            updatedMonthData.push({
-              date: dateStr,
-              steps: todaySteps,
-              distance: Math.round((todaySteps / STEPS_PER_KM) * 100) / 100,
-              calories: Math.round(todaySteps * CALORIES_PER_STEP)
-            });
-          } else {
-            // For other days, use 0 or try to get from daily data
-            const dayData = localStorage.getItem(`${STORAGE_KEY}-${dateStr}`);
-            const steps = dayData ? JSON.parse(dayData).steps : 0;
-            updatedMonthData.push({
-              date: dateStr,
-              steps: steps,
-              distance: Math.round((steps / STEPS_PER_KM) * 100) / 100,
-              calories: Math.round(steps * CALORIES_PER_STEP)
-            });
-          }
+          // For other days, use 0 steps (we don't have historical data from native service yet)
+          monthData.push({
+            date: dateStr,
+            steps: 0,
+            distance: 0,
+            calories: 0
+          });
         }
       }
       
-      setMonthlySteps(updatedMonthData);
-      localStorage.setItem(`${STORAGE_KEY}-monthly`, JSON.stringify(updatedMonthData));
+      setMonthlySteps(monthData);
     } catch (error) {
       console.error('Error loading monthly steps:', error);
       setMonthlySteps([]);
@@ -326,23 +328,10 @@ export function useSteps() {
   };
 
   const startFallbackTracking = useCallback(() => {
-    // Fallback step tracking using localStorage and periodic updates
-    // This simulates step counting for demo purposes
+    // Don't simulate steps - only track real steps from device sensors
+    // This fallback will only store steps when they're manually added
+    console.log('Step tracking started - waiting for real device sensor data');
     setIsTracking(true);
-    
-    // Simulate step counting with random increments
-    if (updateIntervalRef.current) {
-      clearInterval(updateIntervalRef.current);
-    }
-    
-    updateIntervalRef.current = setInterval(() => {
-      setTodaySteps(prev => {
-        const increment = Math.floor(Math.random() * 3) + 1; // Add 1-3 steps every 5 seconds
-        const newSteps = prev + increment;
-        saveTodaySteps(newSteps, true);
-        return newSteps;
-      });
-    }, 5000); // Update every 5 seconds
   }, []);
 
   const startTracking = useCallback(async () => {

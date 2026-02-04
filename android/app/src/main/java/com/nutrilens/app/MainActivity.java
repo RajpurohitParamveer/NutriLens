@@ -1,6 +1,7 @@
 package com.nutrilens.app;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
@@ -47,6 +48,8 @@ public class MainActivity extends BridgeActivity {
             ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
         } else {
             Log.d(TAG, "Activity Recognition permission already granted");
+            // Start step counter service if permission is already granted
+            startStepCounterService();
         }
     }
     
@@ -57,9 +60,21 @@ public class MainActivity extends BridgeActivity {
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Log.d(TAG, "Activity Recognition permission granted");
+                // Start step counter service when permission is granted
+                startStepCounterService();
             } else {
                 Log.d(TAG, "Activity Recognition permission denied");
             }
+        }
+    }
+    
+    private void startStepCounterService() {
+        try {
+            Intent serviceIntent = new Intent(this, StepCounterService.class);
+            startService(serviceIntent);
+            Log.d(TAG, "Step counter service started");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start step counter service", e);
         }
     }
     
@@ -71,21 +86,64 @@ public class MainActivity extends BridgeActivity {
     
     public void updateGoal(int dailyGoal) {
         Log.d(TAG, "updateGoal called with goal: " + dailyGoal);
-        NutrilensWidgetUpdateService.updateGoal(this, dailyGoal);
+        StepCounterService.updateGoal(this, dailyGoal);
     }
     
     // JavaScript interface for web view calls
     public class WidgetJSInterface {
+        private boolean isUpdatingWidget = false;
+        
         @JavascriptInterface
         public void updateWidget(int steps, int dailyGoal) {
-            Log.d(TAG, "JS Interface updateWidget called");
-            updateWidget(steps, dailyGoal);
+            // Prevent infinite recursion
+            if (isUpdatingWidget) {
+                Log.d(TAG, "Widget update already in progress, skipping");
+                return;
+            }
+            
+            try {
+                isUpdatingWidget = true;
+                Log.d(TAG, "JS Interface updateWidget called with steps: " + steps + ", goal: " + dailyGoal);
+                
+                // Call widget service directly to avoid recursion
+                NutrilensWidgetUpdateService.updateWidget(MainActivity.this, steps, dailyGoal);
+                
+                Log.d(TAG, "Widget updated successfully from JS interface");
+            } catch (Exception e) {
+                Log.e(TAG, "Error updating widget from JS interface", e);
+            } finally {
+                isUpdatingWidget = false;
+            }
         }
         
         @JavascriptInterface
         public void updateGoal(int dailyGoal) {
-            Log.d(TAG, "JS Interface updateGoal called");
-            updateGoal(dailyGoal);
+            Log.d(TAG, "JS Interface updateGoal called with goal: " + dailyGoal);
+            
+            try {
+                // Call StepCounterService directly to avoid recursion
+                StepCounterService.updateGoal(MainActivity.this, dailyGoal);
+                
+                Log.d(TAG, "Goal updated successfully from JS interface");
+            } catch (Exception e) {
+                Log.e(TAG, "Error updating goal from JS interface", e);
+            }
+        }
+        
+        @JavascriptInterface
+        public int getCurrentSteps() {
+            Log.d(TAG, "JS Interface getCurrentSteps called");
+            
+            // Ensure service is running
+            try {
+                Intent serviceIntent = new Intent(MainActivity.this, StepCounterService.class);
+                startService(serviceIntent);
+                Log.d(TAG, "Step counter service start requested");
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to start step counter service", e);
+            }
+            
+            return StepCounterService.getCurrentSteps(MainActivity.this);
         }
     }
 }

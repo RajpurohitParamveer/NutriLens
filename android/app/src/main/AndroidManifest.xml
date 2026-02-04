@@ -46,6 +46,11 @@
             <meta-data android:name="android.appwidget.provider"
                 android:resource="@xml/nutrilens_widget_small_info" />
         </receiver>
+        
+        <!-- Step Counter Service -->
+        <service android:name=".StepCounterService"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
