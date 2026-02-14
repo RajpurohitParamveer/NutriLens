@@ -1,8 +1,10 @@
 import { useTheme } from "next-themes";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import {
   ChevronRight,
   User,
@@ -13,18 +15,20 @@ import {
   Flag,
   Footprints,
   Award,
+  Globe,
 } from "lucide-react";
 
 export default function Profile() {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <AppLayout>
       {/* Header */}
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border safe-top">
         <div className="flex items-center h-14 px-4">
-          <h1 className="text-lg font-semibold text-foreground">Settings</h1>
+          <h1 className="text-lg font-semibold text-foreground">{t('settings.title')}</h1>
         </div>
       </header>
 
@@ -32,24 +36,30 @@ export default function Profile() {
         {/* Settings Sections */}
         <section>
           <h3 className="text-sm font-medium text-muted-foreground mb-2 px-1">
-            Preferences
+            {t('settings.preferences')}
           </h3>
           <Card className="bg-card border-border divide-y divide-border">
             <SettingsItem
               icon={Target}
-              label="Health Goals"
-              description="Set your dietary preferences"
+              label={t('settings.healthGoals')}
+              description={t('settings.healthGoalsDesc')}
               onClick={() => navigate("/health-goals")}
             />
             <SettingsItem
               icon={Flag}
-              label="Daily Step Goal"
-              description="Set your daily step target"
+              label={t('settings.dailyStepGoal')}
+              description={t('settings.dailyStepGoalDesc')}
               onClick={() => navigate("/step-goal")}
             />
             <SettingsItem
+              icon={Globe}
+              label={t('settings.language')}
+              description={t('settings.languageDesc')}
+              rightElement={<LanguageSelector />}
+            />
+            <SettingsItem
               icon={Moon}
-              label="Dark Mode"
+              label={t('settings.darkMode')}
               rightElement={
                 <Switch 
                   checked={theme === "dark"} 
@@ -62,19 +72,19 @@ export default function Profile() {
 
         <section>
           <h3 className="text-sm font-medium text-muted-foreground mb-2 px-1">
-            Activity
+            {t('settings.activity')}
           </h3>
           <Card className="bg-card border-border divide-y divide-border">
             <SettingsItem
               icon={Footprints}
-              label="Steps Counter"
-              description="Track daily steps"
+              label={t('settings.stepsCounter')}
+              description={t('settings.stepsCounterDesc')}
               onClick={() => navigate("/steps")}
             />
             <SettingsItem
               icon={Award}
-              label="Achievements"
-              description="View your badges"
+              label={t('settings.achievements')}
+              description={t('settings.achievementsDesc')}
               onClick={() => navigate("/achievements")}
             />
           </Card>
@@ -82,17 +92,17 @@ export default function Profile() {
 
         <section>
           <h3 className="text-sm font-medium text-muted-foreground mb-2 px-1">
-            Support
+            {t('settings.support')}
           </h3>
           <Card className="bg-card border-border divide-y divide-border">
             <SettingsItem
               icon={Shield}
-              label="Privacy Policy"
+              label={t('settings.privacyPolicy')}
               onClick={() => {}}
             />
             <SettingsItem
               icon={HelpCircle}
-              label="Help & Support"
+              label={t('settings.helpSupport')}
               onClick={() => {}}
             />
           </Card>
@@ -100,7 +110,7 @@ export default function Profile() {
 
         {/* App Version */}
         <p className="text-center text-xs text-muted-foreground pt-4">
-          NutriLens v1.0.0
+          {t('app.name')} v1.0.0
         </p>
       </div>
     </AppLayout>

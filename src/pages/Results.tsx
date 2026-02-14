@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { supabase, supabaseClient } from "@/integrations/supabase/client";
+import { useTranslation } from "react-i18next";
 
 // Helper function to safely format nutritional values
 const formatNutrientValue = (value: number | null | undefined): string => {
@@ -174,6 +175,7 @@ export default function Results() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const loadResult = async () => {
@@ -201,8 +203,8 @@ export default function Results() {
             const sanitizedScan = sanitizeScanData(scan);
             setResult({
               scanId: sanitizedScan.id,
-              productName: sanitizedScan.product_name || "Unknown Product",
-              servingSize: sanitizedScan.servingSize || "1 serving",
+              productName: sanitizedScan.product_name === "Unknown Product" ? t('results.unknownProduct') : sanitizedScan.product_name,
+              servingSize: sanitizedScan.servingSize === "1 serving" ? t('results.oneServing') : sanitizedScan.servingSize,
               nutritionData: sanitizedScan.nutritionData || {
                 calories: 0,
                 protein: 0,
@@ -242,8 +244,8 @@ export default function Results() {
             const aiAnalysis = data.ai_analysis as Record<string, unknown> | null;
             const loadedResult: ScanResult = {
               scanId: data.id,
-              productName: data.product_name || "Unknown Product",
-              servingSize: (aiAnalysis?.servingSize as string) || "1 serving",
+              productName: !data.product_name || data.product_name === "Unknown Product" ? t('results.unknownProduct') : data.product_name,
+              servingSize: (!aiAnalysis?.servingSize || (aiAnalysis?.servingSize as string) === "1 serving") ? t('results.oneServing') : (aiAnalysis?.servingSize as string),
               nutritionData: {
                 calories: (data.calories && !isNaN(data.calories) && isFinite(data.calories)) ? data.calories : 0,
                 protein: (data.protein && !isNaN(data.protein) && isFinite(data.protein)) ? data.protein : 0,
@@ -269,7 +271,7 @@ export default function Results() {
         }
       } catch (err) {
         console.error("Error loading result:", err);
-        setError("Failed to load scan results");
+        setError(t('results.noResultsFound'));
       } finally {
         setLoading(false);
       }
@@ -305,25 +307,25 @@ export default function Results() {
       }
       
       toast({
-        title: "Scan deleted",
-        description: "The scan has been removed from your history.",
+        title: t('results.scanDeleted'),
+        description: t('results.scanDeletedDesc'),
       });
       
       navigate("/home");
     } catch (err) {
       toast({
-        title: "Delete failed",
-        description: "Failed to delete the scan.",
+        title: t('results.deleteFailed'),
+        description: t('results.deleteFailedDesc'),
         variant: "destructive",
       });
     }
   };
 
   const getScoreMessage = (score: number) => {
-    if (score >= 80) return "Excellent choice! This food is very nutritious.";
-    if (score >= 60) return "Good choice. This food aligns with healthy eating guidelines.";
-    if (score >= 40) return "Moderate choice. Consider limiting intake.";
-    return "This food has nutritional concerns. Consume sparingly.";
+    if (score >= 80) return t('results.excellentChoice');
+    if (score >= 60) return t('results.goodChoice');
+    if (score >= 40) return t('results.moderateChoice');
+    return t('results.nutritionalConcerns');
   };
 
   const handleEditName = () => {
@@ -362,18 +364,18 @@ export default function Results() {
   if (error || !result) {
     return (
       <AppLayout showNav={false}>
-        <Header title="Results" showBack />
+        <Header title={t('results.title')} showBack />
         <div className="flex flex-col items-center justify-center p-8 text-center">
           <AlertTriangle className="w-12 h-12 text-destructive mb-4" />
           <h2 className="text-lg font-semibold text-foreground mb-2">
-            {error || "No Results Found"}
+            {error || t('results.noResultsFound')}
           </h2>
           <p className="text-muted-foreground mb-6">
-            Try scanning a nutrition label again.
+            {t('results.tryScanningAgain')}
           </p>
           <Button onClick={() => navigate("/scan")}>
             <Camera className="w-5 h-5 mr-2" />
-            Scan Again
+            {t('results.scanAgain')}
           </Button>
         </div>
       </AppLayout>
@@ -404,7 +406,7 @@ export default function Results() {
   return (
     <AppLayout showNav={false}>
       <Header
-        title="Scan Results"
+        title={t('results.title')}
         showBack
         rightElement={
           <div className="flex items-center gap-2">
@@ -416,18 +418,18 @@ export default function Results() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this scan?</AlertDialogTitle>
+                  <AlertDialogTitle>{t('results.deleteThisScan')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete "{result.productName}" from your history. This action cannot be undone.
+                    {t('results.deleteScanDesc', { productName: result.productName })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDelete}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Delete
+                  {t('common.delete')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -454,7 +456,7 @@ export default function Results() {
                 }}
                 maxLength={100}
                 className="text-center font-bold"
-                placeholder="Enter product name"
+                placeholder={t('results.enterProductName')}
               />
               <Button size="icon" variant="ghost" onClick={handleSaveName} className="h-8 w-8">
                 <Check className="h-4 w-4 text-primary" />
@@ -471,7 +473,7 @@ export default function Results() {
                 variant="ghost"
                 onClick={handleEditName}
                 className="h-7 w-7"
-                title="Edit product name"
+                title={t('results.editProductName')}
               >
                 <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
@@ -495,10 +497,10 @@ export default function Results() {
               variant="outline"
             >
               {adjustedHealthScore >= 65
-                ? "Healthy Choice"
+                ? t('results.healthyChoice')
                 : adjustedHealthScore < 40
-                ? "Needs Improvement"
-                : "Moderate"}
+                ? t('results.needsImprovement')
+                : t('results.moderate')}
             </Badge>
             <p className="text-sm text-muted-foreground mt-3 text-center max-w-xs">
               {getScoreMessage(adjustedHealthScore)}
@@ -506,7 +508,7 @@ export default function Results() {
             {goals && goalRecommendations.length > 0 && (
               <div className="mt-3 w-full">
                 <p className="text-xs font-medium text-foreground mb-2 text-center">
-                  Based on your health goals:
+                  {t('results.basedOnHealthGoals')}
                 </p>
                 <div className="space-y-1">
                   {goalRecommendations.slice(0, 2).map((rec, idx) => (
@@ -539,29 +541,29 @@ export default function Results() {
 
         {/* Key Nutritional Highlights */}
         <section>
-          <h2 className="font-semibold text-foreground mb-3">Key Highlights</h2>
+          <h2 className="font-semibold text-foreground mb-3">{t('results.keyHighlights')}</h2>
           <div className="grid grid-cols-2 gap-3">
             <NutrientCard
               icon={Flame}
-              label="Calories"
+              label={t('results.calories')}
               value={formatNutrientValue(nutritionData.calories)}
               unit="kcal"
             />
             <NutrientCard
               icon={Wheat}
-              label="Protein"
+              label={t('results.protein')}
               value={formatNutrientValue(nutritionData.protein)}
               unit="g"
             />
             <NutrientCard
               icon={Droplets}
-              label="Fat"
+              label={t('results.fat')}
               value={formatNutrientValue(nutritionData.fat)}
               unit="g"
             />
             <NutrientCard
               icon={Cookie}
-              label="Carbs"
+              label={t('results.carbs')}
               value={formatNutrientValue(nutritionData.carbohydrates)}
               unit="g"
             />
@@ -572,7 +574,7 @@ export default function Results() {
         {allInsights.length > 0 && (
           <section>
             <h2 className="font-semibold text-foreground mb-3">
-              {goals ? "Personalized Insights" : "AI Insights"}
+              {goals ? t('results.personalizedInsights') : t('results.aiInsights')}
             </h2>
             <Card className="p-4 bg-card border-border">
               <div className="space-y-2">
@@ -601,7 +603,7 @@ export default function Results() {
             </Card>
             {!goals && (
               <p className="text-xs text-muted-foreground mt-2 text-center">
-                Set your health goals in Settings for personalized recommendations
+            {t('results.setHealthGoals')}
               </p>
             )}
           </section>
@@ -611,11 +613,9 @@ export default function Results() {
         <Button
           variant="outline"
           className="w-full h-12 justify-between"
-          onClick={() =>
-            navigate(`/details/${result.scanId || scanId}`, { state: { result } })
-          }
+          onClick={() => navigate(`/details/${result.scanId || scanId}`, { state: { result } })}
         >
-          View Detailed Breakdown
+          {t('results.viewDetailedBreakdown')}
           <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
@@ -628,14 +628,14 @@ export default function Results() {
             className="flex-1 h-12"
             onClick={() => navigate("/history")}
           >
-            View History
+            {t('results.viewHistory')}
           </Button>
           <Button
             className="flex-1 h-12 gradient-primary"
             onClick={() => navigate("/scan")}
           >
             <Camera className="w-5 h-5 mr-2" />
-            Scan Another
+            {t('results.scanAnother')}
           </Button>
         </div>
       </div>

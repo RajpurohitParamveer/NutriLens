@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertCircle } from "lucide-react";
 import { analyzeNutritionWithAI } from "@/services/ai-nutrition-service";
+import { useTranslation } from "react-i18next";
 
 type ProcessingStep = {
   id: string;
@@ -11,13 +12,14 @@ type ProcessingStep = {
 };
 
 const initialSteps: ProcessingStep[] = [
-  { id: "analyze", label: "Analyzing image with AI...", status: "pending" },
-  { id: "extract", label: "Extracting nutrition data...", status: "pending" },
-  { id: "calculate", label: "Calculating health score...", status: "pending" },
+  { id: "analyze", label: "processing.analyzingImage", status: "pending" },
+  { id: "extract", label: "processing.extractingData", status: "pending" },
+  { id: "calculate", label: "processing.calculatingScore", status: "pending" },
 ];
 
 export default function Processing() {
   const navigate = useNavigate();
+  const { i18n, t } = useTranslation();
   const [steps, setSteps] = useState<ProcessingStep[]>(initialSteps);
   const [error, setError] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -32,7 +34,7 @@ export default function Processing() {
     const image = sessionStorage.getItem("captured-image");
     
     if (!image) {
-      setError("No image found. Please try scanning again.");
+      setError(t('processing.noImageFound'));
       return;
     }
     
@@ -42,8 +44,8 @@ export default function Processing() {
       // Step 1: Analyzing image with AI
       updateStep("analyze", "active");
       
-      // Call the AI service
-      const analysis = await analyzeNutritionWithAI(image);
+      // Call the AI service with language
+      const analysis = await analyzeNutritionWithAI(image, i18n.language);
       
       updateStep("analyze", "complete");
 
@@ -125,7 +127,7 @@ export default function Processing() {
   };
 
   const currentStep = steps.find((s) => s.status === "active")?.label || 
-                      (error ? "Processing failed" : "Starting...");
+                      (error ? t('processing.processingFailed') : t('processing.analyzingWithAI'));
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
@@ -161,7 +163,7 @@ export default function Processing() {
       <h2 className={`text-xl font-semibold mb-2 transition-colors ${
         error ? "text-destructive" : "text-foreground"
       }`}>
-        {error ? "Processing Failed" : "Analyzing with AI..."}
+        {error ? t('processing.processingFailed') : t('processing.analyzingWithAI')}
       </h2>
       <p className="text-muted-foreground mb-8 text-center max-w-xs">
         {error || currentStep}
@@ -211,7 +213,7 @@ export default function Processing() {
                   : "text-muted-foreground"
               }`}
             >
-              {step.label}
+              {t(step.label)}
             </span>
           </div>
         ))}
@@ -222,15 +224,15 @@ export default function Processing() {
         {error ? (
           <>
             <Button variant="outline" onClick={handleCancel}>
-              Back to Scan
+              {t('processing.backToScan')}
             </Button>
             <Button onClick={handleRetry}>
-              Try Again
+              {t('processing.tryAgain')}
             </Button>
           </>
         ) : (
           <Button variant="outline" onClick={handleCancel}>
-            Cancel
+            {t('processing.cancel')}
           </Button>
         )}
       </div>
@@ -238,7 +240,7 @@ export default function Processing() {
       {/* Time Estimate */}
       {!error && (
         <p className="text-xs text-muted-foreground mt-6">
-          AI analysis may take up to 10 seconds
+          {t('processing.aiAnalysisTime')}
         </p>
       )}
     </div>

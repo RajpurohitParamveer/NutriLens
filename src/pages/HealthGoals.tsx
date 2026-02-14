@@ -19,6 +19,7 @@ import {
   Heart,
   Leaf,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface HealthGoals {
   goal: "lose" | "maintain" | "gain" | null;
@@ -29,24 +30,6 @@ interface HealthGoals {
 
 const STORAGE_KEY = "nutrilens-health-goals";
 
-const dietTypes = [
-  { id: "vegetarian", label: "Vegetarian", icon: Leaf },
-  { id: "vegan", label: "Vegan", icon: Leaf },
-  { id: "keto", label: "Keto", icon: Apple },
-  { id: "paleo", label: "Paleo", icon: Apple },
-  { id: "mediterranean", label: "Mediterranean", icon: Heart },
-];
-
-const commonAllergies = [
-  "Gluten",
-  "Dairy",
-  "Nuts",
-  "Soy",
-  "Eggs",
-  "Shellfish",
-  "Fish",
-];
-
 export default function HealthGoals() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -56,6 +39,25 @@ export default function HealthGoals() {
     dailyCalories: null,
     allergies: [],
   });
+  const { t } = useTranslation();
+
+  const dietTypes = [
+    { id: "vegetarian", label: t('healthGoals.vegetarian'), icon: Leaf },
+    { id: "vegan", label: t('healthGoals.vegan'), icon: Leaf },
+    { id: "keto", label: t('healthGoals.keto'), icon: Apple },
+    { id: "paleo", label: t('healthGoals.paleo'), icon: Apple },
+    { id: "mediterranean", label: t('healthGoals.mediterranean'), icon: Heart },
+  ];
+
+  const commonAllergies = [
+    t('healthGoals.gluten'),
+    t('healthGoals.dairy'),
+    t('healthGoals.nuts'),
+    t('healthGoals.soy'),
+    t('healthGoals.eggs'),
+    t('healthGoals.shellfish'),
+    t('healthGoals.fish'),
+  ];
 
   useEffect(() => {
     // Load saved goals
@@ -71,10 +73,10 @@ export default function HealthGoals() {
 
   const handleSave = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
-    toast({
-      title: "Health goals saved",
-      description: "Your preferences have been updated.",
-    });
+      toast({
+        title: t('healthGoals.healthGoalsSaved'),
+        description: t('healthGoals.preferencesUpdated'),
+      });
     navigate("/profile");
   };
 
@@ -98,13 +100,13 @@ export default function HealthGoals() {
 
   return (
     <AppLayout showNav={false}>
-      <Header title="Health Goals" showBack />
+      <Header title={t('healthGoals.title')} showBack />
 
       <div className="p-4 space-y-6 pb-32">
         {/* Health Goal Selection */}
         <section>
           <Label className="text-base font-semibold mb-3 block">
-            What's your health goal?
+            {t('healthGoals.whatsYourHealthGoal')}
           </Label>
           <RadioGroup
             value={goals.goal || ""}
@@ -119,10 +121,10 @@ export default function HealthGoals() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <Target className="w-5 h-5 text-primary" />
-                    <span className="font-medium text-foreground">Lose Weight</span>
+                    <span className="font-medium text-foreground">{t('healthGoals.loseWeight')}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Reduce calorie intake and increase activity
+                    {t('healthGoals.loseWeightDesc')}
                   </p>
                 </div>
               </label>
@@ -134,10 +136,10 @@ export default function HealthGoals() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <Heart className="w-5 h-5 text-primary" />
-                    <span className="font-medium text-foreground">Maintain Weight</span>
+                    <span className="font-medium text-foreground">{t('healthGoals.maintainWeight')}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Keep current weight and health
+                    {t('healthGoals.maintainWeightDesc')}
                   </p>
                 </div>
               </label>
@@ -149,10 +151,10 @@ export default function HealthGoals() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <Dumbbell className="w-5 h-5 text-primary" />
-                    <span className="font-medium text-foreground">Gain Weight</span>
+                    <span className="font-medium text-foreground">{t('healthGoals.gainWeight')}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Build muscle and increase calorie intake
+                    {t('healthGoals.gainWeightDesc')}
                   </p>
                 </div>
               </label>
@@ -163,7 +165,7 @@ export default function HealthGoals() {
         {/* Dietary Preferences */}
         <section>
           <Label className="text-base font-semibold mb-3 block">
-            Dietary Preferences
+            {t('healthGoals.dietaryPreferences')}
           </Label>
           <div className="grid grid-cols-2 gap-3">
             {dietTypes.map((diet) => {
@@ -211,12 +213,12 @@ export default function HealthGoals() {
         {/* Daily Calorie Target */}
         <section>
           <Label htmlFor="calories" className="text-base font-semibold mb-3 block">
-            Daily Calorie Target (Optional)
+            {t('healthGoals.dailyCalorieTarget')}
           </Label>
           <Input
             id="calories"
             type="number"
-            placeholder="e.g., 2000"
+            placeholder={t('healthGoals.caloriePlaceholder')}
             value={goals.dailyCalories || ""}
             onChange={(e) =>
               setGoals((prev) => ({
@@ -227,14 +229,14 @@ export default function HealthGoals() {
             className="bg-card border-border"
           />
           <p className="text-xs text-muted-foreground mt-2">
-            Leave empty to use default recommendations based on your goal
+            {t('healthGoals.calorieHelper')}
           </p>
         </section>
 
         {/* Allergies & Intolerances */}
         <section>
           <Label className="text-base font-semibold mb-3 block">
-            Allergies & Intolerances
+            {t('healthGoals.allergiesIntolerances')}
           </Label>
           <div className="flex flex-wrap gap-2">
             {commonAllergies.map((allergy) => {
@@ -259,7 +261,7 @@ export default function HealthGoals() {
             })}
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Tap to add or remove allergies
+            {t('healthGoals.allergyHelper')}
           </p>
         </section>
 
@@ -269,7 +271,7 @@ export default function HealthGoals() {
             className="w-full h-12 gradient-primary shadow-primary"
             onClick={handleSave}
           >
-            Save Health Goals
+            {t('healthGoals.saveHealthGoals')}
           </Button>
         </div>
       </div>

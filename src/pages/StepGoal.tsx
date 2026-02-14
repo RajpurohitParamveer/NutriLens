@@ -9,12 +9,14 @@ import { Label } from "@/components/ui/label";
 import { useSteps } from "@/hooks/use-steps";
 import { useToast } from "@/hooks/use-toast";
 import { Flag } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export default function StepGoal() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { dailyStepGoal, setDailyStepGoal } = useSteps();
   const [value, setValue] = useState(String(dailyStepGoal));
+  const { t } = useTranslation();
 
   useEffect(() => {
     setValue(String(dailyStepGoal));
@@ -24,23 +26,23 @@ export default function StepGoal() {
     const n = parseInt(value.replace(/\D/g, ""), 10);
     if (isNaN(n) || n < 1) {
       toast({
-        title: "Invalid goal",
-        description: "Please enter a valid step goal (1–200,000).",
+        title: t('stepGoal.invalidGoal'),
+        description: t('stepGoal.invalidGoalDesc'),
         variant: "destructive",
       });
       return;
     }
     setDailyStepGoal(n);
     toast({
-      title: "Step goal saved",
-      description: `Daily goal set to ${n.toLocaleString()} steps.`,
+      title: t('stepGoal.stepGoalSaved'),
+      description: t('stepGoal.stepGoalSavedDesc', { steps: n.toLocaleString() }),
     });
     navigate("/profile");
   };
 
   return (
     <AppLayout showNav={false}>
-      <Header title="Daily Step Goal" showBack />
+      <Header title={t('stepGoal.title')} showBack />
 
       <div className="p-4 space-y-6">
         <Card className="p-6 bg-card border-border">
@@ -49,27 +51,27 @@ export default function StepGoal() {
               <Flag className="w-6 h-6 text-accent" />
             </div>
             <div>
-              <h2 className="font-semibold text-foreground">Set your daily target</h2>
+              <h2 className="font-semibold text-foreground">{t('stepGoal.setYourDailyTarget')}</h2>
               <p className="text-sm text-muted-foreground">
-                Typical goals: 5,000 – 10,000 steps
+                {t('stepGoal.typicalGoals')}
               </p>
             </div>
           </div>
           <Label htmlFor="step-goal" className="text-sm font-medium text-foreground">
-            Steps per day
+            {t('stepGoal.stepsPerDay')}
           </Label>
           <Input
             id="step-goal"
             type="number"
             min={1}
             max={200000}
-            placeholder="e.g., 10000"
+            placeholder={t('stepGoal.stepPlaceholder')}
             value={value}
             onChange={(e) => setValue(e.target.value)}
             className="mt-2 bg-background border-border text-lg"
           />
           <p className="text-xs text-muted-foreground mt-2">
-            Enter a value between 1 and 200,000
+            {t('stepGoal.enterValueBetween')}
           </p>
         </Card>
 
@@ -77,7 +79,7 @@ export default function StepGoal() {
           className="w-full h-12 gradient-primary shadow-primary"
           onClick={handleSave}
         >
-          Save Step Goal
+          {t('stepGoal.saveStepGoal')}
         </Button>
       </div>
     </AppLayout>

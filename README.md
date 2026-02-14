@@ -64,23 +64,37 @@ NutriLens focuses on making healthier choices easy:
 
 ---
 ## Screenshots
-  ### Home Page
-  ![Home Page](Screenshots/5.png)
+  <table align="center">
+  <tr>
+  <td align="center">
+  <img src="Screenshots/5.png" width="220"/><br/>
+  <b>Home</b>
+  </td>
+  <td align="center">
+  <img src="Screenshots/6.png" width="220"/><br/>
+  <b>Scan History</b>
+  </td>
+  <td align="center">
+  <img src="Screenshots/7.png" width="220"/><br/>
+  <b>Settings</b>
+  </td>
+  </tr>
 
-  ### Scan History
-  ![Scan History](Screenshots/6.png)
-
-  ### Settings
-  ![Settings](Screenshots/7.png)
-
-  ### Health Goals
-  ![Health Goals](Screenshots/3.png)
-
-  ### Step Counter
-  ![Step Counter](Screenshots/1.png)
-
-  ### Achievments
-  ![Achievments](Screenshots/4.png)
+  <tr>
+  <td align="center">
+  <img src="Screenshots/3.png" width="220"/><br/>
+  <b>Health Goals</b>
+  </td>
+  <td align="center">
+  <img src="Screenshots/1.png" width="220"/><br/>
+  <b>Step Counter</b>
+  </td>
+  <td align="center">
+  <img src="Screenshots/4.png" width="220"/><br/>
+  <b>Achievements</b>
+  </td>
+  </tr>
+  </table>
 
 ---
 
@@ -156,7 +170,7 @@ npm run preview   # optional: serve the built app locally
 Want to experience NutriLens without building it yourself? You can download the pre-built Android APK:
 
 ### Direct APK Download
-- **Download**: [NutriLens.apk](App/NutriLens.apk)
+- **Download**: [NutriLens.apk](https://github.com/RajpurohitParamveer/NutriLens/releases/download/v1.0.0/NutriLens.apk)
 - **Size**: ~15MB
 - **Requirements**: Android 8.0+ (API 26+)
 

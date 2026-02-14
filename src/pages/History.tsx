@@ -45,10 +45,12 @@ import {
 import { useScans, SortOption, FilterOption, Scan } from "@/hooks/use-scans";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 export default function History() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("date-desc");
@@ -68,14 +70,14 @@ export default function History() {
     const { error } = await deleteScan(scanId);
     if (error) {
       toast({
-        title: "Delete failed",
+        title: t('history.deleteFailed'),
         description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
-        title: "Scan deleted",
-        description: "The scan has been removed from your history.",
+        title: t('history.scanDeleted'),
+        description: t('history.scanDeletedDesc'),
       });
     }
   };
@@ -84,14 +86,14 @@ export default function History() {
     const { error } = await clearHistory();
     if (error) {
       toast({
-        title: "Clear failed",
+        title: t('history.clearFailed'),
         description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
-        title: "History cleared",
-        description: "All scans have been removed from your history.",
+        title: t('history.historyCleared'),
+        description: t('history.historyClearedDesc'),
       });
     }
   };
@@ -119,7 +121,7 @@ export default function History() {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border safe-top">
         <div className="flex items-center justify-between h-14 px-4">
-          <h1 className="text-lg font-semibold text-foreground">History</h1>
+          <h1 className="text-lg font-semibold text-foreground">{t('history.title')}</h1>
           <div className="flex gap-1">
             <Button
               variant="ghost"
@@ -152,7 +154,7 @@ export default function History() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search scans..."
+            placeholder={t('history.searchPlaceholder')}
             className="pl-9 h-10 bg-card border-border"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -173,28 +175,28 @@ export default function History() {
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
             <SelectTrigger className="w-[140px] h-9 bg-card">
               <SortAsc className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Sort by" />
+              <SelectValue placeholder={t('history.sortBy')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="date-desc">Newest first</SelectItem>
-              <SelectItem value="date-asc">Oldest first</SelectItem>
-              <SelectItem value="score-desc">Highest score</SelectItem>
-              <SelectItem value="score-asc">Lowest score</SelectItem>
-              <SelectItem value="name-asc">Name A-Z</SelectItem>
-              <SelectItem value="name-desc">Name Z-A</SelectItem>
+              <SelectItem value="date-desc">{t('history.newestFirst')}</SelectItem>
+              <SelectItem value="date-asc">{t('history.oldestFirst')}</SelectItem>
+              <SelectItem value="score-desc">{t('history.highestScore')}</SelectItem>
+              <SelectItem value="score-asc">{t('history.lowestScore')}</SelectItem>
+              <SelectItem value="name-asc">{t('history.nameAZ')}</SelectItem>
+              <SelectItem value="name-desc">{t('history.nameZA')}</SelectItem>
             </SelectContent>
           </Select>
 
           {/* Health Filter */}
           <Select value={filterBy} onValueChange={(v) => setFilterBy(v as FilterOption)}>
             <SelectTrigger className="w-[130px] h-9 bg-card">
-              <SelectValue placeholder="Filter" />
+              <SelectValue placeholder={t('history.filter')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All ratings</SelectItem>
-              <SelectItem value="healthy">Healthy</SelectItem>
-              <SelectItem value="moderate">Moderate</SelectItem>
-              <SelectItem value="unhealthy">Unhealthy</SelectItem>
+              <SelectItem value="all">{t('history.allRatings')}</SelectItem>
+              <SelectItem value="healthy">{t('history.healthy')}</SelectItem>
+              <SelectItem value="moderate">{t('history.moderate')}</SelectItem>
+              <SelectItem value="unhealthy">{t('history.unhealthy')}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -205,13 +207,13 @@ export default function History() {
                 <CalendarIcon className="w-4 h-4 mr-2" />
                 {startDate || endDate
                   ? `${startDate ? format(startDate, "MMM d") : "Start"} - ${endDate ? format(endDate, "MMM d") : "End"}`
-                  : "Date range"}
+                  : t('history.dateRange')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <div className="p-3 space-y-3">
                 <div>
-                  <p className="text-sm font-medium mb-2">Start date</p>
+                  <p className="text-sm font-medium mb-2">{t('history.startDate')}</p>
                   <Calendar
                     mode="single"
                     selected={startDate}
@@ -220,7 +222,7 @@ export default function History() {
                   />
                 </div>
                 <div>
-                  <p className="text-sm font-medium mb-2">End date</p>
+                  <p className="text-sm font-medium mb-2">{t('history.endDate')}</p>
                   <Calendar
                     mode="single"
                     selected={endDate}
@@ -237,7 +239,7 @@ export default function History() {
                     setEndDate(undefined);
                   }}
                 >
-                  Clear dates
+                  {t('history.clearDates')}
                 </Button>
               </div>
             </PopoverContent>
@@ -256,13 +258,13 @@ export default function History() {
         {!loading && scans.length > 0 && (
           <div className="flex gap-2 text-sm">
             <Badge variant="outline" className="bg-healthy/10 text-healthy border-healthy/20">
-              {stats.healthy} healthy
+              {stats.healthy} {t('history.healthy')}
             </Badge>
             <Badge variant="outline" className="bg-accent/10 text-accent border-accent/20">
-              {stats.moderate} moderate
+              {stats.moderate} {t('history.moderate')}
             </Badge>
             <Badge variant="outline" className="bg-unhealthy/10 text-unhealthy border-unhealthy/20">
-              {stats.unhealthy} unhealthy
+              {stats.unhealthy} {t('history.unhealthy')}
             </Badge>
           </div>
         )}
@@ -274,20 +276,20 @@ export default function History() {
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
                   <Trash2 className="w-4 h-4 mr-2" />
-                  Clear History
+                  {t('history.clearHistory')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Clear all history?</AlertDialogTitle>
+                  <AlertDialogTitle>{t('history.clearAllHistory')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete all your scanned items. This action cannot be undone.
+                    {t('history.clearAllHistoryDesc')}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleClearHistory} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Delete All
+                    {t('history.deleteAll')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -320,16 +322,16 @@ export default function History() {
               <TrendingUp className="w-10 h-10 text-muted-foreground" />
             </div>
             <h3 className="font-semibold text-foreground mb-2">
-              {hasActiveFilters ? "No matching scans" : "No scan history"}
+              {hasActiveFilters ? t('history.noMatchingScans') : t('history.noScanHistory')}
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
               {hasActiveFilters
-                ? "Try adjusting your filters"
-                : "Your scanned nutrition labels will appear here"}
+                ? t('history.tryAdjustingFilters')
+                : t('history.yourScansWillAppear')}
             </p>
             {hasActiveFilters ? (
               <Button variant="outline" onClick={clearFilters}>
-                Clear Filters
+                {t('history.clearFilters')}
               </Button>
             ) : (
               <Button
@@ -337,7 +339,7 @@ export default function History() {
                 onClick={() => navigate("/scan")}
               >
                 <Camera className="w-4 h-4 mr-2" />
-                Start Scanning
+                {t('history.startScanning')}
               </Button>
             )}
           </Card>
@@ -357,6 +359,7 @@ export default function History() {
                 viewMode={viewMode}
                 onClick={() => navigate(`/results/${scan.id}`)}
                 onDelete={() => handleDeleteScan(scan.id)}
+                t={t}
               />
             ))}
           </div>
@@ -371,11 +374,13 @@ function ScanCard({
   viewMode,
   onClick,
   onDelete,
+  t,
 }: {
   scan: Scan;
   viewMode: "grid" | "list";
   onClick: () => void;
   onDelete: () => void;
+  t: (key: string) => string;
 }) {
   const healthColor = {
     healthy: "bg-healthy/10 text-healthy border-healthy/20",
@@ -397,7 +402,7 @@ function ScanCard({
           {scan.image_url ? (
             <img
               src={scan.image_url}
-              alt={scan.product_name || "Scan"}
+              alt={scan.product_name || t('history.unknownProduct')}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -423,27 +428,27 @@ function ScanCard({
             </AlertDialogTrigger>
             <AlertDialogContent onClick={(e) => e.stopPropagation()}>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete this scan?</AlertDialogTitle>
+                <AlertDialogTitle>{t('history.deleteScanTitle')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will permanently delete this scan from your history.
+                  {t('history.deleteScanDesc')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                 <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  Delete
+                  {t('common.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         </div>
         <p className="text-sm font-medium text-foreground mt-1 truncate">
-          {scan.product_name || "Unknown Product"}
+          {scan.product_name || t('history.unknownProduct')}
         </p>
         <p className="text-xs text-muted-foreground">
           {scan.created_at && !isNaN(new Date(scan.created_at).getTime())
             ? format(new Date(scan.created_at), "MMM d, yyyy")
-            : "Unknown date"}
+            : t('history.unknownDate')}
         </p>
       </Card>
     );
@@ -459,7 +464,7 @@ function ScanCard({
           {scan.image_url ? (
             <img
               src={scan.image_url}
-              alt={scan.product_name || "Scan"}
+              alt={scan.product_name || t('history.unknownProduct')}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -470,12 +475,12 @@ function ScanCard({
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-foreground truncate">
-            {scan.product_name || "Unknown Product"}
+            {scan.product_name || t('history.unknownProduct')}
           </p>
           <p className="text-sm text-muted-foreground">
             {scan.created_at && !isNaN(new Date(scan.created_at).getTime())
               ? format(new Date(scan.created_at), "MMM d, yyyy 'at' h:mm a")
-              : "Unknown date"}
+              : t('history.unknownDate')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -495,15 +500,15 @@ function ScanCard({
             </AlertDialogTrigger>
             <AlertDialogContent onClick={(e) => e.stopPropagation()}>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete this scan?</AlertDialogTitle>
+                <AlertDialogTitle>{t('history.deleteScanTitle')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will permanently delete this scan from your history.
+                  {t('history.deleteScanDesc')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                 <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  Delete
+                  {t('common.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

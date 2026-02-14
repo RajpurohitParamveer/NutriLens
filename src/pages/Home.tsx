@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -80,6 +81,7 @@ function getProductEmoji(productName: string): string {
 export default function Home() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { goals } = useHealthGoals();
   const { dailyNutrition, calorieProgress, recommendedValues } = useDailyNutrition();
   const { todaySteps, dailyStepGoal, isTracking, startTracking, stopTracking, addSteps, getTotalWeeklySteps } = useSteps();
@@ -97,8 +99,8 @@ export default function Home() {
     localStorage.setItem(SCANS_STORAGE_KEY, JSON.stringify(updatedScans));
     setScans(updatedScans);
     toast({
-      title: "Scan deleted",
-      description: "The scan has been removed from your history.",
+      title: t('home.scanDeleted'),
+      description: t('home.scanDeletedDescription'),
     });
   };
 
@@ -144,15 +146,15 @@ export default function Home() {
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-w-2xl mx-auto safe-left safe-right">
         {/* Welcome Message */}
         <div className="animate-fade-in">
-          <h1 className="text-responsive-xl font-bold text-foreground">Welcome Buddy! 👋</h1>
-          <p className="text-responsive text-muted-foreground mt-1">Ready to make healthier choices today?</p>
+          <h1 className="text-responsive-xl font-bold text-foreground">{t('home.welcomeMessage')}</h1>
+          <p className="text-responsive text-muted-foreground mt-1">{t('home.readyToMakeChoices')}</p>
         </div>
 
         {/* Search Bar */}
         <div className="relative animate-fade-in" style={{ animationDelay: "0.05s" }}>
           <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
           <Input
-            placeholder="Search scan history..."
+            placeholder={t('home.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 sm:pl-11 h-11 sm:h-12 bg-card border-border rounded-xl text-sm sm:text-base focus-visible:ring-primary/50"
@@ -167,7 +169,7 @@ export default function Home() {
           <div className="relative">
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <div>
-                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Today's Scans</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">{t('home.todaysScans')}</p>
                 <p className="text-3xl sm:text-4xl font-bold text-foreground">{todayScans}</p>
               </div>
               <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -178,14 +180,14 @@ export default function Home() {
             <div className="flex gap-2 sm:gap-3">
               <StatBadge
                 icon={CheckCircle2}
-                label="Healthy"
+                label={t('home.healthy')}
                 count={healthyCount}
                 color="text-healthy"
                 bgColor="bg-healthy/10"
               />
               <StatBadge
                 icon={XCircle}
-                label="Unhealthy"
+                label={t('home.unhealthy')}
                 count={unhealthyCount}
                 color="text-unhealthy"
                 bgColor="bg-unhealthy/10"
@@ -202,7 +204,7 @@ export default function Home() {
                 <Footprints className="w-5 h-5 text-accent" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground text-sm sm:text-base">Steps Today</h3>
+                <h3 className="font-semibold text-foreground text-sm sm:text-base">{t('home.stepsToday')}</h3>
                 <p className="text-xs text-muted-foreground">
                   {Math.round((todaySteps / 1300) * 100) / 100} km • {Math.round(todaySteps * 0.04)} cal
                 </p>
@@ -240,8 +242,8 @@ export default function Home() {
                   <TrendingUp className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground text-sm sm:text-base">Today's Nutrition</h3>
-                  <p className="text-xs text-muted-foreground">{dailyNutrition.scansCount} items scanned</p>
+                  <h3 className="font-semibold text-foreground text-sm sm:text-base">{t('home.todaysNutrition')}</h3>
+                  <p className="text-xs text-muted-foreground">{dailyNutrition.scansCount} {t('home.itemsScanned')}</p>
                 </div>
               </div>
               <Button
@@ -256,7 +258,7 @@ export default function Home() {
             
             <div className="grid grid-cols-2 gap-3 mt-3">
               <div className="p-2 bg-muted/50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Calories</p>
+                <p className="text-xs text-muted-foreground mb-1">{t('home.calories')}</p>
                 <p className="text-lg font-bold text-foreground">
                   {Math.round(dailyNutrition.calories)}
                   {calorieProgress && (
@@ -267,19 +269,19 @@ export default function Home() {
                 </p>
               </div>
               <div className="p-2 bg-muted/50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Protein</p>
+                <p className="text-xs text-muted-foreground mb-1">{t('home.protein')}</p>
                 <p className="text-lg font-bold text-foreground">
                   {Math.round(dailyNutrition.protein)}g
                 </p>
               </div>
               <div className="p-2 bg-muted/50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Carbs</p>
+                <p className="text-xs text-muted-foreground mb-1">{t('home.carbs')}</p>
                 <p className="text-lg font-bold text-foreground">
                   {Math.round(dailyNutrition.carbohydrates)}g
                 </p>
               </div>
               <div className="p-2 bg-muted/50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Fat</p>
+                <p className="text-xs text-muted-foreground mb-1">{t('home.fat')}</p>
                 <p className="text-lg font-bold text-foreground">
                   {Math.round(dailyNutrition.fat)}g
                 </p>
@@ -289,7 +291,7 @@ export default function Home() {
             {calorieProgress && (
               <div className="mt-3 pt-3 border-t border-border">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-muted-foreground">Daily Goal Progress</span>
+                  <span className="text-xs text-muted-foreground">{t('home.dailyGoalProgress')}</span>
                   <span className="text-xs font-semibold text-foreground">{calorieProgress.percentage}%</span>
                 </div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -311,9 +313,9 @@ export default function Home() {
                 <Award className="w-5 h-5 text-warning" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground text-sm sm:text-base">Achievements</h3>
+                <h3 className="font-semibold text-foreground text-sm sm:text-base">{t('home.achievements')}</h3>
                 <p className="text-xs text-muted-foreground">
-                  {unlockedCount} of {totalCount} unlocked
+                  {unlockedCount} {t('home.unlockedOf')} {totalCount} {t('home.unlocked')}
                 </p>
               </div>
             </div>
@@ -358,13 +360,13 @@ export default function Home() {
                   <Target className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground text-sm sm:text-base">Your Health Goals</h3>
+                  <h3 className="font-semibold text-foreground text-sm sm:text-base">{t('home.yourHealthGoals')}</h3>
                   <p className="text-xs text-muted-foreground">
-                    {goals.goal === "lose" && "Lose Weight"}
-                    {goals.goal === "maintain" && "Maintain Weight"}
-                    {goals.goal === "gain" && "Gain Weight"}
-                    {!goals.goal && "Not set"}
-                    {goals.dietType.length > 0 && ` • ${goals.dietType.length} diet${goals.dietType.length > 1 ? "s" : ""}`}
+                    {goals.goal === "lose" && t('home.loseWeight')}
+                    {goals.goal === "maintain" && t('home.maintainWeight')}
+                    {goals.goal === "gain" && t('home.gainWeight')}
+                    {!goals.goal && t('home.notSet')}
+                    {goals.dietType.length > 0 && ` • ${goals.dietType.length} ${goals.dietType.length > 1 ? t('home.dietCountPlural') : t('home.dietCount')}`}
                   </p>
                 </div>
               </div>
@@ -380,7 +382,7 @@ export default function Home() {
             {goals.dailyCalories && (
               <div className="mt-2 pt-3 border-t border-primary/20">
                 <p className="text-xs text-muted-foreground">
-                  Daily Target: <span className="font-semibold text-foreground">{goals.dailyCalories} calories</span>
+                  {t('home.dailyTarget')}: <span className="font-semibold text-foreground">{goals.dailyCalories} {t('home.calories').toLowerCase()}</span>
                 </p>
               </div>
             )}
@@ -392,9 +394,9 @@ export default function Home() {
                 <Target className="w-6 h-6 text-primary" />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-foreground text-sm sm:text-base mb-1">Set Your Health Goals</h3>
+                <h3 className="font-semibold text-foreground text-sm sm:text-base mb-1">{t('home.setHealthGoals')}</h3>
                 <p className="text-xs text-muted-foreground">
-                  Get personalized recommendations based on your goals
+                  {t('home.getPersonalizedRecommendations')}
                 </p>
               </div>
               <ArrowRight className="w-5 h-5 text-primary flex-shrink-0" />
@@ -410,13 +412,13 @@ export default function Home() {
           onClick={() => navigate("/scan")}
         >
           <Camera className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
-          Scan Nutrition Label
+          {t('home.scanNutritionLabel')}
         </Button>
 
         {/* Recent Scans Section */}
         <section className="animate-fade-in" style={{ animationDelay: "0.2s" }}>
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h2 className="font-semibold text-foreground text-base sm:text-lg">Recent Scans</h2>
+            <h2 className="font-semibold text-foreground text-base sm:text-lg">{t('home.recentScans')}</h2>
             {filteredScans.length > 0 && (
               <Button
                 variant="ghost"
@@ -424,7 +426,7 @@ export default function Home() {
                 className="text-primary font-medium gap-1"
                 onClick={() => navigate("/history")}
               >
-                View All
+                {t('home.viewAll')}
                 <ChevronRight className="w-4 h-4" />
               </Button>
             )}
@@ -455,9 +457,9 @@ export default function Home() {
                 <span className="text-lg">💡</span>
               </div>
               <div>
-                <p className="font-medium text-foreground text-sm mb-1">Quick Tip</p>
+                <p className="font-medium text-foreground text-sm mb-1">{t('home.quickTip')}</p>
                 <p className="text-sm text-muted-foreground">
-                  For best results, ensure the nutrition label is well-lit and fully visible in the frame.
+                  {t('home.scanTip')}
                 </p>
               </div>
             </div>
@@ -494,6 +496,7 @@ function StatBadge({
 
 function EmptyState({ searchQuery }: { searchQuery?: string }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   
   return (
     <Card className="p-8 bg-card border-border border-dashed flex flex-col items-center text-center">
@@ -501,12 +504,12 @@ function EmptyState({ searchQuery }: { searchQuery?: string }) {
         <TrendingUp className="w-10 h-10 text-muted-foreground" />
       </div>
       <h3 className="font-semibold text-foreground mb-2">
-        {searchQuery ? "No results found" : "No scans yet"}
+        {searchQuery ? t('home.noResultsFound') : t('home.noScansYet')}
       </h3>
       <p className="text-sm text-muted-foreground mb-5 max-w-[200px]">
         {searchQuery 
-          ? `No scans matching "${searchQuery}"`
-          : "Start scanning nutrition labels to track your food choices"
+          ? `${t('home.noScansMatching')} "${searchQuery}"`
+          : t('home.noScansDescription')
         }
       </p>
       {!searchQuery && (
@@ -517,7 +520,7 @@ function EmptyState({ searchQuery }: { searchQuery?: string }) {
           onClick={() => navigate("/scan")}
         >
           <Camera className="w-4 h-4" />
-          Start Scanning
+          {t('home.startScanning')}
         </Button>
       )}
     </Card>
@@ -538,6 +541,7 @@ interface ScanCardProps {
 }
 
 function ScanCard({ scan, onClick, onDelete, style }: ScanCardProps) {
+  const { t } = useTranslation();
   const isHealthy = scan.healthScore >= 60;
   
   return (
@@ -576,13 +580,13 @@ function ScanCard({ scan, onClick, onDelete, style }: ScanCardProps) {
           </AlertDialogTrigger>
           <AlertDialogContent onClick={(e) => e.stopPropagation()}>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete this scan?</AlertDialogTitle>
+              <AlertDialogTitle>{t('home.deleteScanTitle')}</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete "{scan.name}" from your history. This action cannot be undone.
+                {t('home.deleteScanDescription')} "{scan.name}" {t('home.fromHistory')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={(e) => {
                   e.stopPropagation();
@@ -590,7 +594,7 @@ function ScanCard({ scan, onClick, onDelete, style }: ScanCardProps) {
                 }}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Delete
+                {t('common.delete')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

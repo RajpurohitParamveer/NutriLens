@@ -138,20 +138,23 @@ export function useAchievements() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    for (let i = 0; i < sortedScans.length; i++) {
-      const scanDate = new Date(sortedScans[i].created_at);
-      scanDate.setHours(0, 0, 0, 0);
+    // Check consecutive days backwards from today
+    for (let daysBack = 0; daysBack < sortedScans.length; daysBack++) {
+      const checkDate = new Date(today);
+      checkDate.setDate(today.getDate() - daysBack);
+      checkDate.setHours(0, 0, 0, 0);
 
-      const expectedDate = new Date(today);
-      expectedDate.setDate(today.getDate() - streak);
+      // Find if there's a scan on this date
+      const hasScanOnDate = sortedScans.some(scan => {
+        const scanDate = new Date(scan.created_at);
+        scanDate.setHours(0, 0, 0, 0);
+        return scanDate.getTime() === checkDate.getTime();
+      });
 
-      if (
-        scanDate.getTime() === expectedDate.getTime() ||
-        (streak === 0 && scanDate.getTime() === today.getTime())
-      ) {
+      if (hasScanOnDate) {
         streak++;
       } else {
-        break;
+        break; // Break streak when a day is missed
       }
     }
 

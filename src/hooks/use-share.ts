@@ -176,7 +176,7 @@ export function useShare() {
   const canShare = typeof navigator !== "undefined" && !!navigator.share;
   const canShareFiles = canShare && !!navigator.canShare;
 
-  const shareAsImage = async (data: NutritionShareData) => {
+  const shareAsImage = async (data: NutritionShareData): Promise<boolean> => {
     try {
       const imageBlob = await generateShareImage(data);
       const file = new File([imageBlob], `nutrilens-${data.productName.replace(/\s+/g, "-")}.png`, {
@@ -184,39 +184,84 @@ export function useShare() {
       });
 
       // Check if device supports file sharing
-      if (canShareFiles && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: `NutriLens: ${data.productName}`,
-          text: `Health Score: ${data.healthScore}/100`,
-        });
-        return true;
+      if (canShareFiles && navigator.canShare && navigator.canShare({ files: [file] })) {
+        // Try native share first
+        try {
+          await navigator.share({
+            files: [file],
+            title: `NutriLens: ${data.productName}`,
+            text: `Health Score: ${data.healthScore}/100`,
+          });
+          return true;
+        } catch (shareError) {
+          console.log("Native share failed, trying download:", shareError);
+          // Fall back to download if share fails
+          return downloadImage(imageBlob, data.productName);
+        }
       } else {
-        // Fallback: download the image
-        const url = URL.createObjectURL(imageBlob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `nutrilens-${data.productName.replace(/\s+/g, "-")}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        toast({
-          title: "Image downloaded",
-          description: "Share the downloaded image with your friends!",
-        });
-        return true;
+        // Fallback to download if share API not available
+        return downloadImage(imageBlob, data.productName);
       }
     } catch (error) {
       if ((error as Error).name !== "AbortError") {
         console.error("Share failed:", error);
         toast({
           title: "Share failed",
-          description: "Could not share the image. Please try again.",
+          description: "Could not share image. Please try again.",
           variant: "destructive",
         });
       }
+      return false;
+    }
+  };
+
+  // Helper function to download image
+  const downloadImage = async (imageBlob: Blob, productName: string): Promise<boolean> => {
+    try {
+      // Try to save to device storage first
+      if ('share' in navigator && navigator.share && (navigator as any).canShare) {
+        // Create download URL
+        const url = URL.createObjectURL(imageBlob);
+        
+        // Try to share as a URL (this may open save dialog on some devices)
+        await navigator.share({
+          title: `NutriLens: ${productName}`,
+          text: `Download image: ${url}`,
+          url: url
+        });
+        
+        // Clean up
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        
+        toast({
+          title: "Image saved",
+          description: "Image saved to your device!",
+        });
+        return true;
+      }
+      
+      // Fallback: Create download link
+      const url = URL.createObjectURL(imageBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `nutrilens-${productName.replace(/\s+/g, "-")}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Image downloaded",
+        description: "Share downloaded image with your friends!",
+      });
+      return true;
+    } catch (error) {
+      console.error("Download failed:", error);
+      toast({
+        title: "Download failed",
+        description: "Could not download image. Please try again.",
+        variant: "destructive",
+      });
       return false;
     }
   };

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Zap, Image as ImageIcon, Camera, RefreshCw, AlertCircle, ZapOff } from "lucide-react";
 import { useCamera, CameraState } from "@/hooks/use-camera";
 import { useGallery } from "@/hooks/use-gallery";
+import { useTranslation } from "react-i18next";
 
 interface CameraPermissionScreenProps {
   state: CameraState;
@@ -13,41 +14,43 @@ interface CameraPermissionScreenProps {
 }
 
 function CameraPermissionScreen({ state, error, onRetry, onCancel }: CameraPermissionScreenProps) {
+  const { t } = useTranslation();
+  
   const getContent = () => {
     switch (state) {
       case "requesting":
         return {
           icon: <Camera className="h-12 w-12 text-primary animate-pulse" />,
-          title: "Requesting Camera Access",
-          description: "Please allow camera access when prompted to scan nutrition labels.",
+          title: t('scan.requestingCameraAccess'),
+          description: t('scan.requestingCameraDesc'),
           showRetry: false,
         };
       case "denied":
         return {
           icon: <AlertCircle className="h-12 w-12 text-destructive" />,
-          title: "Camera Access Denied",
-          description: error || "Camera permission was denied. Please enable camera access in your browser settings.",
+          title: t('scan.cameraAccessDenied'),
+          description: error || t('scan.cameraAccessDeniedDesc'),
           showRetry: true,
         };
       case "not-supported":
         return {
           icon: <AlertCircle className="h-12 w-12 text-muted-foreground" />,
-          title: "Camera Not Available",
-          description: error || "Your device doesn't have a camera or it's not accessible.",
+          title: t('scan.cameraNotAvailable'),
+          description: error || t('scan.cameraNotAvailableDesc'),
           showRetry: false,
         };
       case "error":
         return {
           icon: <AlertCircle className="h-12 w-12 text-destructive" />,
-          title: "Camera Error",
-          description: error || "Something went wrong while accessing the camera.",
+          title: t('scan.cameraError'),
+          description: error || t('scan.cameraErrorDesc'),
           showRetry: true,
         };
       default:
         return {
           icon: <Camera className="h-12 w-12 text-primary" />,
-          title: "Camera Ready",
-          description: "Tap to start the camera",
+          title: t('scan.cameraReady'),
+          description: t('scan.cameraReadyDesc'),
           showRetry: true,
         };
     }
@@ -73,7 +76,7 @@ function CameraPermissionScreen({ state, error, onRetry, onCancel }: CameraPermi
             className="flex-1 border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10"
             onClick={onCancel}
           >
-            Go Back
+            {t('scan.goBack')}
           </Button>
           {content.showRetry && (
             <Button
@@ -81,7 +84,7 @@ function CameraPermissionScreen({ state, error, onRetry, onCancel }: CameraPermi
               onClick={onRetry}
             >
               <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
+              {t('scan.tryAgain')}
             </Button>
           )}
         </div>
@@ -98,6 +101,7 @@ interface ImagePreviewProps {
 
 function ImagePreview({ image, onConfirm, onRetake }: ImagePreviewProps) {
   const [servingSize, setServingSize] = useState("");
+  const { t } = useTranslation();
 
   const handleConfirm = () => {
     onConfirm(servingSize.trim() || undefined);
@@ -108,7 +112,7 @@ function ImagePreview({ image, onConfirm, onRetake }: ImagePreviewProps) {
       <div className="flex-1 relative">
         <img
           src={image}
-          alt="Captured nutrition label"
+          alt={t('scan.capturedNutritionLabel')}
           className="absolute inset-0 w-full h-full object-contain animate-fade-in-up"
         />
         
@@ -118,19 +122,19 @@ function ImagePreview({ image, onConfirm, onRetake }: ImagePreviewProps) {
       
       <div className="bg-foreground pb-10 pt-6 safe-bottom">
         <p className="text-primary-foreground/70 text-sm text-center mb-3">
-          Is the nutrition label clearly visible?
+          {t('scan.isLabelVisible')}
         </p>
         
         {/* Serving Size Input (Optional) */}
         <div className="mb-4 px-8">
           <label className="block text-xs text-primary-foreground/60 mb-2 text-center">
-            Serving Size (Optional)
+            {t('scan.servingSizeOptional')}
           </label>
           <input
             type="text"
             value={servingSize}
             onChange={(e) => setServingSize(e.target.value)}
-            placeholder="e.g., 1 cup, 100g, 1 piece"
+            placeholder={t('scan.servingSizePlaceholder')}
             className="w-full px-4 py-2.5 bg-background/20 backdrop-blur-sm border border-primary-foreground/20 rounded-lg text-primary-foreground placeholder:text-primary-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
           />
         </div>
@@ -142,14 +146,14 @@ function ImagePreview({ image, onConfirm, onRetake }: ImagePreviewProps) {
             className="flex-1 border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10"
             onClick={onRetake}
           >
-            Retake
+            {t('scan.retake')}
           </Button>
           <Button
             size="lg"
             className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary"
             onClick={handleConfirm}
           >
-            Analyze Label
+            {t('scan.analyzeLabel')}
           </Button>
         </div>
       </div>
@@ -191,6 +195,7 @@ export default function Scan() {
   const navigate = useNavigate();
   const [flashOn, setFlashOn] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   const {
     videoRef,
@@ -328,7 +333,7 @@ export default function Scan() {
         
         <div className="text-center">
           <span className="text-primary-foreground/90 text-sm font-medium">
-            Scan Label
+            {t('scan.scanLabel')}
           </span>
         </div>
         
@@ -351,7 +356,7 @@ export default function Scan() {
         <div className="absolute bottom-32 left-0 right-0 text-center px-6 z-10">
           <div className="inline-block px-4 py-2 rounded-full bg-foreground/60 backdrop-blur-sm">
             <p className="text-primary-foreground text-sm font-medium">
-              Position nutrition label within the frame
+              {t('scan.positionLabelInFrame')}
             </p>
           </div>
         </div>
@@ -394,7 +399,7 @@ export default function Scan() {
         {/* Gallery hint when camera is not available */}
         {cameraState !== "active" && cameraState !== "idle" && (
           <p className="text-center text-primary-foreground/60 text-xs mt-4 animate-fade-in-up">
-            Tap the gallery icon to select an image from your device
+            {t('scan.tapGalleryToSelect')}
           </p>
         )}
       </div>

@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { useBackButton } from "@/hooks/use-back-button";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import "./i18n";
 import Welcome, { isFirstLaunch } from "./pages/Welcome";
 import Home from "./pages/Home";
 import Scan from "./pages/Scan";

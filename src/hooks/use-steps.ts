@@ -15,6 +15,12 @@ const STEP_GOAL_KEY = "nutrilens-step-goal";
 const DEFAULT_STEP_GOAL = 8000;
 const STEPS_PER_KM = 1400; // Average steps per kilometer
 const CALORIES_PER_STEP = 0.05; // Rough estimate
+function dateStrLocal(d: Date = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
 
 /**
  * Hook to track and manage step count
@@ -23,9 +29,36 @@ const CALORIES_PER_STEP = 0.05; // Rough estimate
 export function useSteps() {
   const { updateWidget } = useWidget();
   
-  const [todaySteps, setTodaySteps] = useState<number>(0);
+  const [todaySteps, setTodaySteps] = useState<number>(() => {
+    // Initialize with stored data immediately to prevent showing 0
+    try {
+      const today = dateStrLocal();
+      const stored = localStorage.getItem(`${STORAGE_KEY}-${today}`);
+      if (stored) {
+        const data = JSON.parse(stored);
+        return data.steps || 0;
+      }
+    } catch (error) {
+      console.log('Failed to load initial steps:', error);
+    }
+    return 0;
+  });
+  
   const [isSupported, setIsSupported] = useState(false);
-  const [isTracking, setIsTracking] = useState(false);
+  const [isTracking, setIsTracking] = useState<boolean>(() => {
+    // Initialize with stored tracking state
+    try {
+      const today = dateStrLocal();
+      const stored = localStorage.getItem(`${STORAGE_KEY}-${today}`);
+      if (stored) {
+        const data = JSON.parse(stored);
+        return data.isTracking || false;
+      }
+    } catch (error) {
+      console.log('Failed to load initial tracking state:', error);
+    }
+    return false;
+  });
   const [weeklySteps, setWeeklySteps] = useState<StepsData[]>([]);
   const [monthlySteps, setMonthlySteps] = useState<StepsData[]>([]);
   const [dailyStepGoal, setDailyStepGoalState] = useState<number>(DEFAULT_STEP_GOAL);
@@ -35,6 +68,18 @@ export function useSteps() {
 
   // Load today's steps and step goal
   useEffect(() => {
+    try {
+      const weekly = localStorage.getItem(`${STORAGE_KEY}-weekly`);
+      if (weekly) {
+        setWeeklySteps(JSON.parse(weekly));
+      }
+    } catch {}
+    try {
+      const monthly = localStorage.getItem(`${STORAGE_KEY}-monthly`);
+      if (monthly) {
+        setMonthlySteps(JSON.parse(monthly));
+      }
+    } catch {}
     loadTodaySteps();
     loadWeeklySteps();
     loadMonthlySteps();
@@ -53,6 +98,24 @@ export function useSteps() {
     }
   }, [todaySteps, dailyStepGoal, updateWidget]);
 
+  async function waitForNativeAndHydrate() {
+    if (!Capacitor.isNativePlatform()) {
+      loadTodaySteps();
+      return;
+    }
+    for (let i = 0; i < 20; i++) {
+      try {
+        const androidWidget = (window as any).AndroidWidget;
+        if (androidWidget && androidWidget.getCurrentSteps) {
+          loadTodaySteps();
+          return;
+        }
+      } catch (e) { void e; }
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    loadTodaySteps();
+  }
+
   const checkSupport = async () => {
     // Check if we're on a native platform with step counter support
     const isNative = Capacitor.isNativePlatform();
@@ -61,11 +124,21 @@ export function useSteps() {
       // On Android with Activity Recognition permission, we should support step tracking
       setIsSupported(true);
 
+      try {
+        const androidWidget = (window as any).AndroidWidget;
+        if (androidWidget && androidWidget.ensureStepService) {
+          androidWidget.ensureStepService();
+          console.log('Requested native to ensure step service running');
+        }
+      } catch {}
+ 
       // Start tracking (this will now use the native service)
       if (!isInitializedRef.current) {
         isInitializedRef.current = true;
         startTracking();
       }
+      
+      await waitForNativeAndHydrate();
       
       // Load steps from native service periodically
       if (updateIntervalRef.current) {
@@ -74,7 +147,7 @@ export function useSteps() {
       
       updateIntervalRef.current = setInterval(() => {
         loadTodaySteps();
-      }, 3000); // Update every 3 seconds from native service for responsive charts
+      }, 1000); // Update every 1 second for real-time sync
     } else {
       // For web, step counter not available
       setIsSupported(false);
@@ -151,8 +224,64 @@ export function useSteps() {
           if (androidWidget && androidWidget.getCurrentSteps) {
             // If native method is available, use it
             const steps = androidWidget.getCurrentSteps();
-            setTodaySteps(steps);
-            setIsTracking(true);
+            console.log(`Native step counter returned: ${steps} steps`);
+            
+            // Check if we need to start tracking for a new day
+            const today = dateStrLocal();
+            const stored = localStorage.getItem(`${STORAGE_KEY}-${today}`);
+            
+            if (!stored && steps > 0) {
+              // No stored data but we have steps - this means app was restarted
+              // Don't reset to 0, use the native steps
+              console.log("App restarted with existing steps, preserving count");
+              setTodaySteps(steps);
+              setIsTracking(true);
+              saveTodaySteps(steps, true);
+              
+              // Start tracking if not already running
+              if (!updateIntervalRef.current) {
+                updateIntervalRef.current = setInterval(() => {
+                  loadTodaySteps();
+                }, 1000);
+              }
+            } else if (!stored && steps === 0) {
+              // Truly new day with no steps yet
+              console.log("New day detected, starting automatic step tracking");
+              
+              // Only update state if different to prevent 0 flash
+              if (todaySteps !== 0) {
+                setTodaySteps(0);
+                setIsTracking(true);
+              }
+              saveTodaySteps(0, true);
+              
+              // Start tracking if not already running
+              if (!updateIntervalRef.current) {
+                updateIntervalRef.current = setInterval(() => {
+                  loadTodaySteps();
+                }, 1000);
+              }
+            } else {
+              // Data exists for today, but prioritize native steps if available
+              const data = JSON.parse(stored);
+              const storedSteps = data.steps || 0;
+              const storedTracking = data.isTracking || false;
+              
+              // Always use native steps if available (more up-to-date than localStorage)
+              if (steps !== storedSteps) {
+                console.log(`Native steps (${steps}) differ from stored (${storedSteps}), using native steps`);
+                setTodaySteps(steps);
+                saveTodaySteps(steps, true);
+              } else {
+                // Use stored values if they match native
+                if (todaySteps !== storedSteps) {
+                  setTodaySteps(storedSteps);
+                }
+                if (isTracking !== storedTracking) {
+                  setIsTracking(storedTracking);
+                }
+              }
+            }
             
             // Trigger chart updates with current steps directly
             loadWeeklySteps(steps);
@@ -166,7 +295,7 @@ export function useSteps() {
       }
       
       // Fallback to localStorage
-      const today = new Date().toISOString().split("T")[0];
+      const today = dateStrLocal();
       const stored = localStorage.getItem(`${STORAGE_KEY}-${today}`);
       if (stored) {
         const data = JSON.parse(stored);
@@ -185,7 +314,7 @@ export function useSteps() {
     }
   };
 
-  const loadWeeklySteps = useCallback((currentSteps: number = todaySteps) => {
+  function loadWeeklySteps(currentSteps: number = todaySteps) {
     try {
       const today = new Date();
       const week: StepsData[] = [];
@@ -199,9 +328,9 @@ export function useSteps() {
       for (let i = 0; i < 7; i++) {
         const date = new Date(monday);
         date.setDate(monday.getDate() + i);
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = dateStrLocal(date);
         
-        if (dateStr === today.toISOString().split('T')[0]) {
+        if (dateStr === dateStrLocal(today)) {
           // For today, use current steps from parameter
           week.push({ 
             steps: currentSteps, 
@@ -210,9 +339,19 @@ export function useSteps() {
             calories: Math.round(currentSteps * CALORIES_PER_STEP)
           });
         } else {
-          // For other days, use 0 steps (we don't have historical data from native service yet)
+          // For other days, try to get historical data from native service
+          let historicalSteps = 0;
+          try {
+            const androidWidget = (window as any).AndroidWidget;
+            if (androidWidget && androidWidget.getHistoricalSteps) {
+              historicalSteps = androidWidget.getHistoricalSteps(dateStr) || 0;
+            }
+          } catch (error) {
+            console.log('Failed to get historical steps from native:', error);
+          }
+          
           week.push({ 
-            steps: 0, 
+            steps: historicalSteps, 
             date: dateStr,
             distance: 0,
             calories: 0
@@ -220,13 +359,16 @@ export function useSteps() {
         }
       }
       setWeeklySteps(week);
+      try {
+        localStorage.setItem(`${STORAGE_KEY}-weekly`, JSON.stringify(week));
+      } catch (e) { void e; }
     } catch (error) {
       console.error('Error loading weekly steps:', error);
       setWeeklySteps([]);
     }
-  }, [todaySteps]);
+  }
 
-  const loadMonthlySteps = useCallback((currentSteps: number = todaySteps) => {
+  function loadMonthlySteps(currentSteps: number = todaySteps) {
     try {
       const today = new Date();
       const currentMonth = today.getMonth();
@@ -238,7 +380,7 @@ export function useSteps() {
       // Generate data for each day of the current month
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(currentYear, currentMonth, day);
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = dateStrLocal(date);
         
         if (day === today.getDate()) {
           // For today, use current steps from parameter
@@ -249,10 +391,20 @@ export function useSteps() {
             calories: Math.round(currentSteps * CALORIES_PER_STEP)
           });
         } else {
-          // For other days, use 0 steps (we don't have historical data from native service yet)
+          // For other days, try to get historical data from native service
+          let historicalSteps = 0;
+          try {
+            const androidWidget = (window as any).AndroidWidget;
+            if (androidWidget && androidWidget.getHistoricalSteps) {
+              historicalSteps = androidWidget.getHistoricalSteps(dateStr) || 0;
+            }
+          } catch (error) {
+            console.log('Failed to get historical steps from native:', error);
+          }
+          
           monthData.push({
             date: dateStr,
-            steps: 0,
+            steps: historicalSteps,
             distance: 0,
             calories: 0
           });
@@ -260,14 +412,88 @@ export function useSteps() {
       }
       
       setMonthlySteps(monthData);
+      try {
+        localStorage.setItem(`${STORAGE_KEY}-monthly`, JSON.stringify(monthData));
+      } catch (e) { void e; }
     } catch (error) {
       console.error('Error loading monthly steps:', error);
       setMonthlySteps([]);
     }
-  }, [todaySteps]);
+  }
 
-  const saveTodaySteps = (steps: number, isTracking: boolean = false) => {
-    const today = new Date().toISOString().split("T")[0];
+  const clearHistoricalData = () => {
+    try {
+      // Clear all daily step data from localStorage
+      const keys = Object.keys(localStorage).filter(key => key.startsWith(STORAGE_KEY));
+      keys.forEach(key => {
+        if (!key.includes('-weekly') && !key.includes('-monthly')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Clear weekly and monthly data
+      localStorage.removeItem(`${STORAGE_KEY}-weekly`);
+      localStorage.removeItem(`${STORAGE_KEY}-monthly`);
+      
+      console.log('Historical step data cleared');
+    } catch (error) {
+      console.error('Error clearing historical data:', error);
+    }
+  };
+
+  function checkMidnightTransition() {
+    const today = new Date();
+    const todayStr = dateStrLocal(today);
+    
+    if (lastCheckedDateRef.current && todayStr !== lastCheckedDateRef.current) {
+      // Date has changed, it's a new day
+      const lastDate = new Date(lastCheckedDateRef.current);
+      const isNewMonth = today.getMonth() !== lastDate.getMonth() || today.getFullYear() !== lastDate.getFullYear();
+      
+      console.log("Midnight transition detected", { 
+        isNewMonth, 
+        lastDate: lastCheckedDateRef.current, 
+        today: todayStr 
+      });
+      
+      if (isNewMonth) {
+        // New month started - clear all historical data
+        console.log("New month detected, clearing historical step data");
+        clearHistoricalData();
+      }
+      
+      // Ensure native service rolls to new day and advances baseline
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const androidWidget = (window as any).AndroidWidget;
+          if (androidWidget && androidWidget.resetForNewDay) {
+            androidWidget.resetForNewDay();
+            console.log('Requested native to reset for new day');
+          }
+        } catch (error) {
+          console.log('Failed to request native reset for new day:', error);
+        }
+      }
+      
+      // Reset today's steps to 0 and start tracking automatically
+      const newSteps = 0;
+      setTodaySteps(newSteps);
+      saveTodaySteps(newSteps, true); // Start tracking for new day
+      
+      // Restart tracking for new day
+      if (Capacitor.isNativePlatform() && isSupported) {
+        startTracking();
+      }
+      
+      // Reload weekly and monthly data to update charts
+      loadWeeklySteps();
+      loadMonthlySteps();
+    }
+    lastCheckedDateRef.current = todayStr;
+  }
+
+  function saveTodaySteps(steps: number, isTracking: boolean = false) {
+    const today = dateStrLocal();
     const data: StepsData = {
       steps,
       date: today,
@@ -282,11 +508,11 @@ export function useSteps() {
     // Update weekly and monthly data
     updateWeeklyData(data);
     updateMonthlyData(steps, today);
-  };
+  }
 
-  const updateWeeklyData = (todayData: StepsData) => {
+  function updateWeeklyData(todayData: StepsData) {
     const updated = [...weeklySteps];
-    const today = new Date().toISOString().split("T")[0];
+    const today = dateStrLocal();
     const index = updated.findIndex((d) => d.date === today);
     
     if (index >= 0) {
@@ -299,9 +525,9 @@ export function useSteps() {
     
     setWeeklySteps(updated);
     localStorage.setItem(`${STORAGE_KEY}-weekly`, JSON.stringify(updated));
-  };
+  }
 
-  const updateMonthlyData = (steps: number, dateStr: string) => {
+  function updateMonthlyData(steps: number, dateStr: string) {
     const today = new Date(dateStr);
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
@@ -337,7 +563,7 @@ export function useSteps() {
       localStorage.setItem(`${STORAGE_KEY}-monthly`, JSON.stringify(currentMonthData));
       return currentMonthData;
     });
-  };
+  }
 
   const startFallbackTracking = useCallback(() => {
     // Don't simulate steps - only track real steps from device sensors
@@ -346,12 +572,11 @@ export function useSteps() {
     setIsTracking(true);
   }, []);
 
-  const startTracking = useCallback(async () => {
+  async function startTracking() {
     if (Capacitor.isNativePlatform()) {
-      // Use fallback tracking for now
       startFallbackTracking();
     }
-  }, [startFallbackTracking]);
+  }
 
   const stopTracking = useCallback(async () => {
     // Clear update interval
@@ -367,11 +592,11 @@ export function useSteps() {
   const addSteps = useCallback((steps: number) => {
     const newTotal = todaySteps + steps;
     saveTodaySteps(newTotal, false);
-  }, [todaySteps]);
+  }, [todaySteps, saveTodaySteps]);
 
   const resetTodaySteps = useCallback(() => {
     saveTodaySteps(0, false);
-  }, []);
+  }, [saveTodaySteps]);
 
   const getTotalWeeklySteps = useCallback(() => {
     return weeklySteps.reduce((sum, day) => sum + day.steps, 0);
@@ -428,37 +653,14 @@ export function useSteps() {
       if (updateIntervalRef.current) {
         clearInterval(updateIntervalRef.current);
       }
-      // Don't stop tracking on unmount - keep it running in background
-      // The plugin will handle cleanup when app is destroyed
     };
   }, []);
 
-  // Check for midnight transitions every minute
   useEffect(() => {
-    const checkMidnightTransition = () => {
-      const today = new Date().toISOString().split("T")[0];
-      if (lastCheckedDateRef.current && today !== lastCheckedDateRef.current) {
-        // Date has changed, it's a new day - reset and reload
-        console.log("Midnight transition detected, resetting steps for new day");
-        // Reset today's steps to 0
-        const newSteps = 0;
-        setTodaySteps(newSteps);
-        saveTodaySteps(newSteps, false);
-        // Reload weekly and monthly data to update the charts
-        loadWeeklySteps();
-        loadMonthlySteps();
-      }
-      lastCheckedDateRef.current = today;
-    };
-
-    // Check immediately
-    checkMidnightTransition();
-
-    // Set up periodic checking every minute
-    const interval = setInterval(checkMidnightTransition, 60000); // Check every minute
-
+    lastCheckedDateRef.current = dateStrLocal();
+    const interval = setInterval(checkMidnightTransition, 60000);
     return () => clearInterval(interval);
-  }, [saveTodaySteps, loadWeeklySteps, loadMonthlySteps]);
+  }, []);
 
   return {
     todaySteps,

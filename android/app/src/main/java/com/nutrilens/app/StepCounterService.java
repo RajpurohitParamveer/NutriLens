@@ -37,6 +37,9 @@ public class StepCounterService extends Service implements SensorEventListener {
     // Singleton SharedPreferences manager
     private static SharedPreferences sharedPreferencesInstance;
     
+    // Static instance reference for getCurrentSteps()
+    private static StepCounterService instance;
+    
     /**
      * Get the singleton SharedPreferences instance
      */
@@ -48,29 +51,50 @@ public class StepCounterService extends Service implements SensorEventListener {
         return sharedPreferencesInstance;
     }
     
+    
     private SensorManager sensorManager;
     private Sensor stepDetectorSensor;
     private PowerManager.WakeLock wakeLock;
     private SharedPreferences preferences;
     private int currentSteps = 0;
+    private int baselineSteps = 0; // Baseline for cumulative step counter
     private boolean isSensorRegistered = false;
     private long lastStepTime = 0;
-    private static final long STEP_DELAY_MS = 300; // Minimum 300ms between steps
+    private static final long STEP_DELAY_MS = 150; // Reduced to 150ms between steps for better sensitivity
+    private java.util.Timer midnightTimer;
     
     @Override
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "Step counter service created");
         
+        // Set static instance reference for getCurrentSteps()
+        instance = this;
+        
         // Use singleton SharedPreferences to ensure consistency
         preferences = getSharedPreferences(this);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        // Use TYPE_STEP_DETECTOR for more accurate step detection
-        stepDetectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
+        // Use TYPE_STEP_COUNTER for more accurate cumulative step counting
+        stepDetectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
         
         // Acquire wake lock to keep service running
         PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "StepCounterService::WakeLock");
+        
+        // Do not override LAST_DATE_KEY on start; rollover logic will handle updates
+        
+        // Schedule midnight check every minute
+        midnightTimer = new java.util.Timer(true);
+        midnightTimer.scheduleAtFixedRate(new java.util.TimerTask() {
+            @Override
+            public void run() {
+                try {
+                    resetStepsIfNeeded();
+                } catch (Exception e) {
+                    Log.e(TAG, "Midnight check failed", e);
+                }
+            }
+        }, 60000L, 60000L);
     }
     
     @Override
@@ -142,6 +166,9 @@ public class StepCounterService extends Service implements SensorEventListener {
         super.onDestroy();
         Log.d(TAG, "Step counter service destroyed");
         
+        // Clear static instance reference
+        instance = null;
+        
         // Unregister sensor listener
         if (sensorManager != null && isSensorRegistered) {
             sensorManager.unregisterListener(this);
@@ -154,6 +181,13 @@ public class StepCounterService extends Service implements SensorEventListener {
             wakeLock.release();
             Log.d(TAG, "Wake lock released");
         }
+        
+        if (midnightTimer != null) {
+            try {
+                midnightTimer.cancel();
+            } catch (Exception ignored) {}
+            midnightTimer = null;
+        }
     }
     
     @Nullable
@@ -164,26 +198,75 @@ public class StepCounterService extends Service implements SensorEventListener {
     
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_STEP_DETECTOR) {
+        if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
+            // TYPE_STEP_COUNTER provides cumulative steps since device boot
+            // We need to calculate today's steps by subtracting the baseline
             long currentTime = System.currentTimeMillis();
             
-            // Filter out false positives - require minimum time between steps
-            if (currentTime - lastStepTime < STEP_DELAY_MS) {
-                Log.d(TAG, "Ignoring step - too soon after previous step");
+            // Get the cumulative steps from the sensor
+            int cumulativeSteps = (int) event.values[0];
+            
+            // Before computing today's steps, ensure date rollover is handled
+            try {
+                String currentDateStr = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+                String lastDateStr = preferences.getString(LAST_DATE_KEY, "");
+                if (lastDateStr != null && !lastDateStr.isEmpty() && !currentDateStr.equals(lastDateStr)) {
+                    // Save yesterday's steps
+                    preferences.edit().putInt("steps_" + lastDateStr, currentSteps).apply();
+                    // Advance baseline to exclude yesterday's steps from today
+                    baselineSteps = baselineSteps + currentSteps;
+                    preferences.edit().putInt("baseline_steps", baselineSteps).apply();
+                    // Reset today's steps and update last date
+                    saveSteps(0);
+                    currentSteps = 0;
+                    preferences.edit().putString(LAST_DATE_KEY, currentDateStr).apply();
+                    Log.d(TAG, "onSensorChanged rollover: baseline advanced and today reset");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "onSensorChanged rollover check failed", e);
+            }
+            
+            // If this is the first reading, establish baseline only if we don't have one
+            if (baselineSteps == 0) {
+                // Try to load saved baseline from preferences
+                int savedBaseline = preferences.getInt("baseline_steps", 0);
+                if (savedBaseline > 0) {
+                    if (cumulativeSteps >= savedBaseline) {
+                        // Normal case: restore saved baseline
+                        baselineSteps = savedBaseline;
+                        Log.d(TAG, "Restored baseline steps: " + baselineSteps);
+                    } else {
+                        // Device reboot case: cumulative steps reset to lower value
+                        // Establish new baseline and calculate offset for today's steps
+                        Log.d(TAG, "Device reboot detected - cumulative steps (" + cumulativeSteps + 
+                              ") lower than saved baseline (" + savedBaseline + ")");
+                        baselineSteps = cumulativeSteps;
+                        preferences.edit().putInt("baseline_steps", baselineSteps).apply();
+                        Log.d(TAG, "Establishing new baseline after reboot: " + baselineSteps);
+                    }
+                } else {
+                    // First time running - establish new baseline
+                    baselineSteps = cumulativeSteps;
+                    preferences.edit().putInt("baseline_steps", baselineSteps).apply();
+                    Log.d(TAG, "Establishing initial baseline steps: " + baselineSteps);
+                }
                 return;
             }
             
-            lastStepTime = currentTime;
-            Log.d(TAG, "Step detected!");
+            // Calculate today's steps by subtracting baseline
+            int todaySteps = cumulativeSteps - baselineSteps;
             
-            // Increment step count by 1 for each detected step
-            currentSteps++;
-            saveSteps(currentSteps);
-            
-            // Update widget
-            NutrilensWidgetUpdateService.updateWidget(this, currentSteps, getStepGoal());
-            
-            Log.d(TAG, "Steps updated: " + currentSteps);
+            // Only update if we have meaningful steps and enough time has passed
+            if (todaySteps > currentSteps && (currentTime - lastStepTime >= STEP_DELAY_MS)) {
+                lastStepTime = currentTime;
+                currentSteps = todaySteps;
+                saveSteps(currentSteps);
+                
+                // Update widget
+                NutrilensWidgetUpdateService.updateWidget(this, currentSteps, getStepGoal());
+                
+                Log.d(TAG, "Steps updated: " + currentSteps + " (cumulative: " + cumulativeSteps + ", baseline: " + baselineSteps + ")");
+            }
         }
     }
     
@@ -196,10 +279,29 @@ public class StepCounterService extends Service implements SensorEventListener {
         String currentDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
         String lastDate = preferences.getString(LAST_DATE_KEY, "");
         
+        Log.d(TAG, "resetStepsIfNeeded - currentDate: " + currentDate + ", lastDate: " + lastDate);
+        
         if (!currentDate.equals(lastDate)) {
-            Log.d(TAG, "New day detected, resetting steps");
+            // Save yesterday's steps before resetting
+            if (!lastDate.isEmpty() && currentSteps > 0) {
+                Log.d(TAG, "Saving yesterday's steps: " + currentSteps + " for date: " + lastDate);
+                // Save to historical data (could be expanded to save to database)
+                preferences.edit()
+                    .putInt("steps_" + lastDate, currentSteps)
+                    .apply();
+            }
+            
+            Log.d(TAG, "New day detected, resetting steps from " + currentSteps + " to 0");
+            // Advance baseline to exclude yesterday's steps from today's count
+            baselineSteps = baselineSteps + currentSteps;
+            preferences.edit().putInt("baseline_steps", baselineSteps).apply();
             saveSteps(0);
-            preferences.edit().putString(LAST_DATE_KEY, currentDate).apply();
+            currentSteps = 0; // Also update the in-memory variable
+            preferences.edit()
+                .putString(LAST_DATE_KEY, currentDate)
+                .apply();
+        } else {
+            Log.d(TAG, "Same day, keeping current steps: " + currentSteps);
         }
     }
     
@@ -227,22 +329,70 @@ public class StepCounterService extends Service implements SensorEventListener {
                 SensorManager.SENSOR_DELAY_UI
             );
             isSensorRegistered = registered;
-            Log.d(TAG, "Step detector sensor registered: " + registered);
+            Log.d(TAG, "Step counter sensor registered: " + registered);
             
             if (!registered) {
-                Log.e(TAG, "Failed to register step detector sensor");
+                Log.e(TAG, "Failed to register step counter sensor");
             }
         } else {
-            Log.e(TAG, "No step detector sensor available");
+            Log.e(TAG, "No step counter sensor available");
         }
     }
     
     public static int getCurrentSteps(Context context) {
-        // Use singleton SharedPreferences to ensure consistency
+        // Ensure we don't carry over yesterday's steps
+        ensureNewDay(context);
+        // First try to get from service instance (most up-to-date)
+        if (instance != null) {
+            Log.d(TAG, "getCurrentSteps retrieved: " + instance.currentSteps + " from service instance");
+            return instance.currentSteps;
+        }
+        
+        // Fallback to SharedPreferences if service instance not available
         SharedPreferences prefs = getSharedPreferences(context);
-        int steps = prefs.getInt(STEPS_KEY, 0);
-        Log.d(TAG, "getCurrentSteps retrieved: " + steps + " from SharedPreferences");
-        return steps;
+        int storedSteps = prefs.getInt(STEPS_KEY, 0);
+        
+        Log.d(TAG, "getCurrentSteps retrieved: " + storedSteps + " from SharedPreferences (service instance null)");
+        return storedSteps;
+    }
+    
+    /**
+     * Advance baseline and reset storage if the stored last date differs from today.
+     * This prevents yesterday's steps from being included in today's total.
+     */
+    public static void ensureNewDay(Context context) {
+        try {
+            SharedPreferences prefs = getSharedPreferences(context);
+            String currentDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+            String lastDate = prefs.getString(LAST_DATE_KEY, "");
+            if (lastDate != null && !lastDate.isEmpty() && !currentDate.equals(lastDate)) {
+                int yesterdaySteps = prefs.getInt(STEPS_KEY, 0);
+                int baseline = prefs.getInt("baseline_steps", 0);
+                
+                // Save yesterday's steps to historical key if not already saved
+                prefs.edit().putInt("steps_" + lastDate, yesterdaySteps).apply();
+                
+                // Advance baseline to exclude yesterday
+                baseline = baseline + yesterdaySteps;
+                prefs.edit().putInt("baseline_steps", baseline).apply();
+                
+                // Reset today's storage to 0 and update last date
+                prefs.edit()
+                        .putInt(STEPS_KEY, 0)
+                        .putString(LAST_DATE_KEY, currentDate)
+                        .apply();
+                
+                // Update in-memory instance if available
+                if (instance != null) {
+                    instance.baselineSteps = baseline;
+                    instance.currentSteps = 0;
+                }
+                
+                Log.d(TAG, "ensureNewDay applied: baseline advanced, yesterday saved, today reset");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "ensureNewDay failed", e);
+        }
     }
     
     public static int getCurrentGoal(Context context) {

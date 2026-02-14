@@ -23,19 +23,36 @@ export interface AIAnalysisResult {
   insights: string[];
   warnings: string[];
   rawOcrText: string;
+  responseLanguage?: string; // Track what language the AI responded in
+  localizedRecommendations?: string[]; // Language-specific recommendations
 }
 
 /**
  * Analyze a nutrition label image using AI
  */
 export async function analyzeNutritionWithAI(
-  imageDataUrl: string
+  imageDataUrl: string,
+  language?: string
 ): Promise<AIAnalysisResult> {
-  console.log("Sending image to AI for analysis...");
+  console.log("Sending image to AI for analysis...", { language });
+
+  // Language-specific prompts for better AI responses
+  const languagePrompts = {
+    'en': 'Please respond in English.',
+    'hi': 'कृपया हिंदी में उत्तर दें। सभी सुझाव, चेतावनी और अंतर्दृष्टि हिंदी में प्रदान करें।'
+  };
+
+  const selectedLanguage = language || 'en';
+  const languagePrompt = languagePrompts[selectedLanguage as keyof typeof languagePrompts] || languagePrompts.en;
 
   const client = supabase || supabaseClient;
   const { data, error } = await client.functions.invoke("analyze-nutrition-ai", {
-    body: { imageBase64: imageDataUrl },
+    body: { 
+      imageBase64: imageDataUrl,
+      language: selectedLanguage,
+      languagePrompt: languagePrompt,
+      responseLanguage: selectedLanguage // Explicitly tell AI what language to respond in
+    },
   });
 
   if (error) {

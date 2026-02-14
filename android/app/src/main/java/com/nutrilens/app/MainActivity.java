@@ -1,7 +1,9 @@
 package com.nutrilens.app;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
@@ -48,6 +50,10 @@ public class MainActivity extends BridgeActivity {
         boolean activityRecognitionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED;
         boolean fineLocationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         boolean coarseLocationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        
+        Log.d(TAG, "Permission check - Activity Recognition: " + activityRecognitionGranted);
+        Log.d(TAG, "Permission check - Fine Location: " + fineLocationGranted);
+        Log.d(TAG, "Permission check - Coarse Location: " + coarseLocationGranted);
         
         if (!activityRecognitionGranted || !fineLocationGranted || !coarseLocationGranted) {
             Log.d(TAG, "Requesting permissions for foreground step tracking service");
@@ -149,10 +155,52 @@ public class MainActivity extends BridgeActivity {
         public int getCurrentSteps() {
             Log.d(TAG, "JS Interface getCurrentSteps called");
             
-            // Just get current steps without restarting service
-            // Service should already be running from onCreate
-            // Use singleton SharedPreferences for consistency
-            return StepCounterService.getCurrentSteps(getApplicationContext());
+            // Get current steps from SharedPreferences
+            int steps = StepCounterService.getCurrentSteps(getApplicationContext());
+            Log.d(TAG, "JS Interface getCurrentSteps returning: " + steps);
+            
+            return steps;
+        }
+        
+        @JavascriptInterface
+        public void ensureStepService() {
+            Log.d(TAG, "JS Interface ensureStepService called");
+            try {
+                startStepCounterService();
+                Log.d(TAG, "Step counter service ensured running");
+            } catch (Exception e) {
+                Log.e(TAG, "Error ensuring step counter service", e);
+            }
+        }
+        
+        @JavascriptInterface
+        public void resetForNewDay() {
+            Log.d(TAG, "JS Interface resetForNewDay called");
+            try {
+                StepCounterService.ensureNewDay(getApplicationContext());
+                Log.d(TAG, "New day reset ensured in native service");
+            } catch (Exception e) {
+                Log.e(TAG, "Error resetting for new day", e);
+            }
+        }
+        
+        @JavascriptInterface
+        public int getHistoricalSteps(String date) {
+            Log.d(TAG, "JS Interface getHistoricalSteps called for date: " + date);
+            
+            try {
+                // Get SharedPreferences for historical data
+                SharedPreferences prefs = getApplicationContext()
+                        .getSharedPreferences("nutrilens_steps_prefs", Context.MODE_PRIVATE);
+                String historicalKey = "steps_" + date;
+                int historicalSteps = prefs.getInt(historicalKey, 0);
+                
+                Log.d(TAG, "JS Interface getHistoricalSteps returning: " + historicalSteps + " for date: " + date);
+                return historicalSteps;
+            } catch (Exception e) {
+                Log.e(TAG, "Error getting historical steps for date: " + date, e);
+                return 0;
+            }
         }
     }
 }
