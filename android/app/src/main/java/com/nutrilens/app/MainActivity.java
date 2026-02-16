@@ -25,8 +25,21 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // Request permissions on app start
+        // Request minimal permission on app start
         requestStepTrackingPermissions();
+        // Ensure periodic widget updates are scheduled
+        StepWidgetUpdateWorker.ensureScheduled(getApplicationContext());
+    }
+    
+    @Override
+    public void onResume() {
+        super.onResume();
+        StepCounterOneShot.readSteps(getApplicationContext(), steps -> {
+            try {
+                int goal = StepCounterService.getCurrentGoal(getApplicationContext());
+                NutrilensWidgetUpdateService.updateWidget(getApplicationContext(), steps, goal);
+            } catch (Throwable ignored) {}
+        });
     }
     
     @Override
@@ -39,29 +52,22 @@ public class MainActivity extends BridgeActivity {
     }
     
     private void requestStepTrackingPermissions() {
-        // Request permissions needed for foreground step tracking service
+        // Only Activity Recognition is required for TYPE_STEP_COUNTER on Android 10+
         String[] permissions = {
-            Manifest.permission.ACTIVITY_RECOGNITION,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
+            Manifest.permission.ACTIVITY_RECOGNITION
         };
         
         // Check if permissions are already granted
         boolean activityRecognitionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED;
-        boolean fineLocationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-        boolean coarseLocationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         
         Log.d(TAG, "Permission check - Activity Recognition: " + activityRecognitionGranted);
-        Log.d(TAG, "Permission check - Fine Location: " + fineLocationGranted);
-        Log.d(TAG, "Permission check - Coarse Location: " + coarseLocationGranted);
+        // No location permission required
         
-        if (!activityRecognitionGranted || !fineLocationGranted || !coarseLocationGranted) {
-            Log.d(TAG, "Requesting permissions for foreground step tracking service");
+        if (!activityRecognitionGranted) {
+            Log.d(TAG, "Requesting Activity Recognition permission");
             ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
         } else {
-            Log.d(TAG, "All permissions already granted for foreground service");
-            // Start step counter service if permission is already granted
-            startStepCounterService();
+            Log.d(TAG, "Activity Recognition permission already granted");
         }
     }
     
@@ -78,25 +84,12 @@ public class MainActivity extends BridgeActivity {
                 }
             }
             
-            if (allGranted) {
-                Log.d(TAG, "All permissions granted for foreground service");
-                // Start step counter service when all permissions are granted
-                startStepCounterService();
-            } else {
-                Log.d(TAG, "Some permissions denied - foreground service may not work");
-            }
+            Log.d(TAG, "Permissions result processed. Activity Recognition granted=" + allGranted);
         }
     }
     
-    private void startStepCounterService() {
-        try {
-            Intent serviceIntent = new Intent(this, StepCounterService.class);
-            startService(serviceIntent);
-            Log.d(TAG, "Step counter service started");
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to start step counter service", e);
-        }
-    }
+    // Deprecated in new design; keeping method for compatibility (no-op)
+    private void startStepCounterService() { }
     
     // Bridge methods for widget updates
     public void updateWidget(int steps, int dailyGoal) {
@@ -155,8 +148,8 @@ public class MainActivity extends BridgeActivity {
         public int getCurrentSteps() {
             Log.d(TAG, "JS Interface getCurrentSteps called");
             
-            // Get current steps from SharedPreferences
-            int steps = StepCounterService.getCurrentSteps(getApplicationContext());
+            // One-shot read from hardware counter; no background service
+            int steps = StepCounterOneShot.readCurrentStepsSync(getApplicationContext());
             Log.d(TAG, "JS Interface getCurrentSteps returning: " + steps);
             
             return steps;
@@ -165,12 +158,7 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public void ensureStepService() {
             Log.d(TAG, "JS Interface ensureStepService called");
-            try {
-                startStepCounterService();
-                Log.d(TAG, "Step counter service ensured running");
-            } catch (Exception e) {
-                Log.e(TAG, "Error ensuring step counter service", e);
-            }
+            // No longer needed; we rely on one-shot sensor reads
         }
         
         @JavascriptInterface

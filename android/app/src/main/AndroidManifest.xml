@@ -47,11 +47,20 @@
                 android:resource="@xml/nutrilens_widget_small_info" />
         </receiver>
         
-        <!-- Step Counter Service -->
+        <!-- Optional Step Counter Service (no foreground type, not started by default) -->
         <service android:name=".StepCounterService"
             android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="health" />
+            android:exported="false" />
+
+        <!-- Re-schedule widget updates on boot -->
+        <receiver
+            android:name=".BootCompletedReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Permissions -->
@@ -69,22 +78,17 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     
-    <!-- Location for step counting -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <!-- No location permission required for step counter -->
     
     <!-- Activity recognition for step counting -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.stepdetector" android:required="false" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     
-    <!-- Wake lock for background processing -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Wake lock not required in one-shot design -->
     
-    <!-- Foreground service for step tracking -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <!-- No foreground service permissions required -->
     
     <!-- Vibration -->
     <uses-permission android:name="android.permission.VIBRATE" />
