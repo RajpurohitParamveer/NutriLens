@@ -5,9 +5,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
+import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -29,6 +31,7 @@ public class MainActivity extends BridgeActivity {
         requestStepTrackingPermissions();
         // Ensure periodic widget updates are scheduled
         StepWidgetUpdateWorker.ensureScheduled(getApplicationContext());
+        handleDeepLink(getIntent());
     }
     
     @Override
@@ -48,6 +51,57 @@ public class MainActivity extends BridgeActivity {
         // Add JavaScript interface after the web view is ready
         if (getBridge() != null && getBridge().getWebView() != null) {
             getBridge().getWebView().addJavascriptInterface(new WidgetJSInterface(), "AndroidWidget");
+        }
+    }
+    
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleDeepLink(intent);
+    }
+    
+    private void handleDeepLink(Intent intent) {
+        if (intent == null) return;
+        if (!Intent.ACTION_VIEW.equals(intent.getAction())) return;
+        Uri data = intent.getData();
+        if (data == null) return;
+        if (!"nutrilens".equalsIgnoreCase(data.getScheme())) return;
+        if (!"app".equalsIgnoreCase(data.getHost())) return;
+        if (!"/addsteps".equals(data.getPath())) return;
+        
+        try {
+            String yesterdayParam = data.getQueryParameter("yesterday");
+            String stepsParam = data.getQueryParameter("steps");
+            String dateParam = data.getQueryParameter("date");
+            
+            int addSteps = -1;
+            if (yesterdayParam != null) {
+                addSteps = Integer.parseInt(yesterdayParam);
+                java.util.Calendar cal = java.util.Calendar.getInstance();
+                cal.add(java.util.Calendar.DAY_OF_YEAR, -1);
+                dateParam = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(cal.getTime());
+            } else if (stepsParam != null && dateParam != null) {
+                addSteps = Integer.parseInt(stepsParam);
+            }
+            
+            if (addSteps <= 0 || dateParam == null || dateParam.isEmpty()) {
+                Toast.makeText(this, "Invalid parameters for addsteps", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            SharedPreferences prefs = getApplicationContext().getSharedPreferences("nutrilens_steps_prefs", Context.MODE_PRIVATE);
+            String key = "steps_" + dateParam;
+            int prev = prefs.getInt(key, 0);
+            int next = Math.max(0, prev + addSteps);
+            prefs.edit().putInt(key, next).apply();
+            int goal = StepCounterService.getCurrentGoal(getApplicationContext());
+            NutrilensWidgetUpdateService.updateWidget(getApplicationContext(), prefs.getInt("today_steps", 0), goal);
+            Toast.makeText(this, "Added " + addSteps + " to " + dateParam + " (now " + next + ")", Toast.LENGTH_LONG).show();
+            Log.d(TAG, "Deep link addsteps applied: date=" + dateParam + " prev=" + prev + " next=" + next);
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to handle addsteps deep link", t);
+            Toast.makeText(this, "Failed to add steps: " + t.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
     
@@ -177,7 +231,6 @@ public class MainActivity extends BridgeActivity {
             Log.d(TAG, "JS Interface getHistoricalSteps called for date: " + date);
             
             try {
-                // Get SharedPreferences for historical data
                 SharedPreferences prefs = getApplicationContext()
                         .getSharedPreferences("nutrilens_steps_prefs", Context.MODE_PRIVATE);
                 String historicalKey = "steps_" + date;
@@ -188,6 +241,37 @@ public class MainActivity extends BridgeActivity {
             } catch (Exception e) {
                 Log.e(TAG, "Error getting historical steps for date: " + date, e);
                 return 0;
+            }
+        }
+        
+        @JavascriptInterface
+        public void addStepsToYesterday(int steps) {
+            try {
+                java.util.Calendar cal = java.util.Calendar.getInstance();
+                cal.add(java.util.Calendar.DAY_OF_YEAR, -1);
+                String date = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(cal.getTime());
+                SharedPreferences prefs = getApplicationContext().getSharedPreferences("nutrilens_steps_prefs", Context.MODE_PRIVATE);
+                String key = "steps_" + date;
+                int prev = prefs.getInt(key, 0);
+                int next = Math.max(0, prev + steps);
+                prefs.edit().putInt(key, next).apply();
+                Log.d(TAG, "Added steps to yesterday " + date + ": " + prev + " -> " + next);
+            } catch (Exception e) {
+                Log.e(TAG, "Error adding steps to yesterday", e);
+            }
+        }
+        
+        @JavascriptInterface
+        public void addHistoricalSteps(String date, int steps) {
+            try {
+                SharedPreferences prefs = getApplicationContext().getSharedPreferences("nutrilens_steps_prefs", Context.MODE_PRIVATE);
+                String key = "steps_" + date;
+                int prev = prefs.getInt(key, 0);
+                int next = Math.max(0, prev + steps);
+                prefs.edit().putInt(key, next).apply();
+                Log.d(TAG, "Added steps to " + date + ": " + prev + " -> " + next);
+            } catch (Exception e) {
+                Log.e(TAG, "Error adding steps to " + date, e);
             }
         }
     }

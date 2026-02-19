@@ -25,6 +25,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep link to add historical steps from the phone, e.g.:
+                 nutrilens://app/addsteps?yesterday=12583
+                 nutrilens://app/addsteps?date=2026-02-19&steps=12583 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="nutrilens"
+                    android:host="app"
+                    android:path="/addsteps" />
+            </intent-filter>
         </activity>
 
         <provider

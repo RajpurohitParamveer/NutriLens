@@ -10,15 +10,21 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 public class StepCounterOneShot {
 
     private static final String TAG = "StepOneShot";
-    private static final String PREFS = "steps_prefs";
+    private static final String PREFS = "nutrilens_steps_prefs";
     private static final String KEY_LAST_RAW = "last_raw_counter";
-    private static final String KEY_BASELINE = "baseline_counter";
+    private static final String KEY_BASELINE_DAY = "baseline_day";
+    private static final String KEY_REBOOT_OFFSET = "reboot_offset";
+    private static final String KEY_LAST_DATE = "last_step_date";
+    private static final String KEY_TODAY_STEPS = "today_steps";
 
     public interface Callback {
         void onResult(int todaySteps);
@@ -40,10 +46,8 @@ public class StepCounterOneShot {
             return 0;
         }
 
-        SharedPreferences prefs =
-                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         float lastRaw = prefs.getFloat(KEY_LAST_RAW, -1f);
-        float baseline = prefs.getFloat(KEY_BASELINE, -1f);
 
         CountDownLatch latch = new CountDownLatch(1);
         final float[] currentRaw = {-1f};
@@ -72,24 +76,10 @@ public class StepCounterOneShot {
             try { sensorManager.unregisterListener(listener); } catch (Throwable ignored) {}
         }
 
-        float finalRaw;
-        if (currentRaw[0] >= 0) {
-            finalRaw = currentRaw[0];
-            prefs.edit().putFloat(KEY_LAST_RAW, finalRaw).apply();
-            Log.d(TAG, "[sync] received sensor value: " + finalRaw);
-        } else {
-            finalRaw = lastRaw;
-            Log.d(TAG, "[sync] no event; using last saved raw: " + finalRaw);
-        }
-
-        if (finalRaw < 0) finalRaw = 0;
-        if (baseline < 0) {
-            baseline = finalRaw;
-            prefs.edit().putFloat(KEY_BASELINE, baseline).apply();
-        }
-
-        int todaySteps = (int) (finalRaw - baseline);
-        return Math.max(todaySteps, 0);
+        boolean hasEvent = currentRaw[0] >= 0;
+        float rawToUse = hasEvent ? currentRaw[0] : lastRaw;
+        int steps = computeAndPersist(context, rawToUse, hasEvent);
+        return steps;
     }
 
     public static void readSteps(Context context, Callback callback) {
@@ -109,11 +99,8 @@ public class StepCounterOneShot {
                 return;
             }
 
-            SharedPreferences prefs =
-                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-
+            SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             float lastRaw = prefs.getFloat(KEY_LAST_RAW, -1f);
-            float baseline = prefs.getFloat(KEY_BASELINE, -1f);
 
             CountDownLatch latch = new CountDownLatch(1);
             final float[] currentRaw = {-1f};
@@ -145,35 +132,83 @@ public class StepCounterOneShot {
 
             Log.d(TAG, "Listener unregistered");
 
-            float finalRaw;
-
-            if (currentRaw[0] >= 0) {
-                finalRaw = currentRaw[0];
-                prefs.edit().putFloat(KEY_LAST_RAW, finalRaw).apply();
-                Log.d(TAG, "Received sensor value: " + finalRaw);
-            } else {
-                finalRaw = lastRaw;
-                Log.d(TAG, "No new sensor event. Using last saved raw: " + finalRaw);
-            }
-
-            if (finalRaw < 0) {
-                finalRaw = 0;
-            }
-
-            if (baseline < 0) {
-                baseline = finalRaw;
-                prefs.edit().putFloat(KEY_BASELINE, baseline).apply();
-            }
-
-            int todaySteps = (int) (finalRaw - baseline);
-
-            if (todaySteps < 0) todaySteps = 0;
-
-            int finalSteps = todaySteps;
+            boolean hasEvent = currentRaw[0] >= 0;
+            float rawToUse = hasEvent ? currentRaw[0] : lastRaw;
+            int finalSteps = computeAndPersist(context, rawToUse, hasEvent);
 
             new Handler(Looper.getMainLooper())
                     .post(() -> callback.onResult(finalSteps));
 
         }).start();
+    }
+
+    private static int computeAndPersist(Context context, float currentRaw, boolean hasNewEvent) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        if (currentRaw < 0) currentRaw = 0f;
+
+        float lastRaw = getFloatCompat(prefs, KEY_LAST_RAW, -1f);
+        float rebootOffset = getFloatCompat(prefs, KEY_REBOOT_OFFSET, 0f);
+        float baselineDay = getFloatCompat(prefs, KEY_BASELINE_DAY, -1f);
+        String lastDate = prefs.getString(KEY_LAST_DATE, null);
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+
+        boolean rebooted = lastRaw >= 0 && currentRaw < lastRaw;
+        if (rebooted) {
+            rebootOffset += lastRaw;
+            Log.d(TAG, "Reboot detected, increasing rebootOffset by lastRaw=" + lastRaw + " to " + rebootOffset);
+        }
+
+        float cumulative = currentRaw + rebootOffset;
+
+        boolean newDay = (lastDate == null) || !today.equals(lastDate);
+        if (newDay) {
+            baselineDay = cumulative;
+            lastDate = today;
+            Log.d(TAG, "New day detected, resetting baselineDay to " + baselineDay + " for date " + today);
+        }
+
+        if (baselineDay < 0) {
+            baselineDay = cumulative;
+            if (lastDate == null) lastDate = today;
+        }
+
+        int todaySteps = (int) Math.max(0, Math.floor(cumulative - baselineDay));
+
+        SharedPreferences.Editor e = prefs.edit();
+        if (hasNewEvent) {
+            e.putFloat(KEY_LAST_RAW, currentRaw);
+        }
+        e.putFloat(KEY_REBOOT_OFFSET, rebootOffset);
+        e.putFloat(KEY_BASELINE_DAY, baselineDay);
+        e.putString(KEY_LAST_DATE, lastDate);
+        e.putInt(KEY_TODAY_STEPS, todaySteps);
+        e.apply();
+
+        return todaySteps;
+    }
+
+    /**
+     * Tolerant float reader to avoid ClassCastException if older versions stored int/long/string.
+     */
+    private static float getFloatCompat(SharedPreferences prefs, String key, float defValue) {
+        try {
+            return prefs.getFloat(key, defValue);
+        } catch (ClassCastException ignore) {
+            try {
+                return (float) prefs.getInt(key, (int) defValue);
+            } catch (ClassCastException ignore2) {
+                try {
+                    return (float) prefs.getLong(key, (long) defValue);
+                } catch (ClassCastException ignore3) {
+                    try {
+                        String s = prefs.getString(key, null);
+                        if (s != null) return Float.parseFloat(s);
+                    } catch (Throwable ignore4) {
+                        // ignore
+                    }
+                }
+            }
+            return defValue;
+        }
     }
 }
