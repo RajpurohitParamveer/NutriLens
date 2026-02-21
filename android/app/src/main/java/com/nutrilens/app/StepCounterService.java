@@ -211,8 +211,13 @@ public class StepCounterService extends Service implements SensorEventListener {
                 String currentDateStr = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
                 String lastDateStr = preferences.getString(LAST_DATE_KEY, "");
                 if (lastDateStr != null && !lastDateStr.isEmpty() && !currentDateStr.equals(lastDateStr)) {
-                    // Save yesterday's steps
-                    preferences.edit().putInt("steps_" + lastDateStr, currentSteps).apply();
+                    // Save yesterday's steps without overwriting non-zero history with zero
+                    String histKey = "steps_" + lastDateStr;
+                    int existingHist = preferences.getInt(histKey, -1);
+                    int toStore = (existingHist >= 0) ? Math.max(existingHist, currentSteps) : currentSteps;
+                    if (toStore > 0) {
+                        preferences.edit().putInt(histKey, toStore).apply();
+                    }
                     // Advance baseline to exclude yesterday's steps from today
                     baselineSteps = baselineSteps + currentSteps;
                     preferences.edit().putInt("baseline_steps", baselineSteps).apply();
@@ -281,14 +286,16 @@ public class StepCounterService extends Service implements SensorEventListener {
         
         Log.d(TAG, "resetStepsIfNeeded - currentDate: " + currentDate + ", lastDate: " + lastDate);
         
-        if (!currentDate.equals(lastDate)) {
+            if (!currentDate.equals(lastDate)) {
             // Save yesterday's steps before resetting
-            if (!lastDate.isEmpty() && currentSteps > 0) {
-                Log.d(TAG, "Saving yesterday's steps: " + currentSteps + " for date: " + lastDate);
-                // Save to historical data (could be expanded to save to database)
-                preferences.edit()
-                    .putInt("steps_" + lastDate, currentSteps)
-                    .apply();
+            if (!lastDate.isEmpty()) {
+                String histKey = "steps_" + lastDate;
+                int existingHist = preferences.getInt(histKey, -1);
+                int toStore = (existingHist >= 0) ? Math.max(existingHist, currentSteps) : currentSteps;
+                if (toStore > 0) {
+                    Log.d(TAG, "Saving yesterday's steps: " + toStore + " for date: " + lastDate);
+                    preferences.edit().putInt(histKey, toStore).apply();
+                }
             }
             
             Log.d(TAG, "New day detected, resetting steps from " + currentSteps + " to 0");
@@ -370,7 +377,12 @@ public class StepCounterService extends Service implements SensorEventListener {
                 int baseline = prefs.getInt("baseline_steps", 0);
                 
                 // Save yesterday's steps to historical key if not already saved
-                prefs.edit().putInt("steps_" + lastDate, yesterdaySteps).apply();
+                String histKey = "steps_" + lastDate;
+                int existingHist = prefs.getInt(histKey, -1);
+                int toStore = (existingHist >= 0) ? Math.max(existingHist, yesterdaySteps) : yesterdaySteps;
+                if (toStore > 0) {
+                    prefs.edit().putInt(histKey, toStore).apply();
+                }
                 
                 // Advance baseline to exclude yesterday
                 baseline = baseline + yesterdaySteps;

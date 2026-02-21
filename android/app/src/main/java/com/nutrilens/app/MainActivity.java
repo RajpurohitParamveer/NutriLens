@@ -31,6 +31,14 @@ public class MainActivity extends BridgeActivity {
         requestStepTrackingPermissions();
         // Ensure periodic widget updates are scheduled
         StepWidgetUpdateWorker.ensureScheduled(getApplicationContext());
+        try {
+            Intent svc = new Intent(this, StepForegroundService.class);
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                startForegroundService(svc);
+            } else {
+                startService(svc);
+            }
+        } catch (Throwable ignored) {}
         handleDeepLink(getIntent());
     }
     

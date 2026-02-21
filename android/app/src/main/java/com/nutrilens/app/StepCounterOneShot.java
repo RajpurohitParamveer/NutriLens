@@ -161,6 +161,8 @@ public class StepCounterOneShot {
         float cumulative = currentRaw + rebootOffset;
 
         boolean newDay = (lastDate == null) || !today.equals(lastDate);
+        String prevDate = lastDate;
+        int prevStoredForSnapshot = (newDay && prevDate != null) ? prefs.getInt(KEY_TODAY_STEPS, 0) : -1;
         if (newDay) {
             baselineDay = cumulative;
             lastDate = today;
@@ -182,6 +184,9 @@ public class StepCounterOneShot {
         e.putFloat(KEY_BASELINE_DAY, baselineDay);
         e.putString(KEY_LAST_DATE, lastDate);
         e.putInt(KEY_TODAY_STEPS, todaySteps);
+        if (prevStoredForSnapshot >= 0 && prevDate != null) {
+            e.putInt("steps_" + prevDate, prevStoredForSnapshot);
+        }
         e.apply();
 
         return todaySteps;
